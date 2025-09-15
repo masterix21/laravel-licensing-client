@@ -15,12 +15,13 @@ class ActivateLicenseCommand extends Command
     {
         $licenseKey = $this->argument('key') ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             $licenseKey = $this->ask('Please enter your license key');
         }
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             $this->error('License key is required');
+
             return self::FAILURE;
         }
 
@@ -47,9 +48,11 @@ class ActivateLicenseCommand extends Command
             }
 
             $this->error('Failed to activate license');
+
             return self::FAILURE;
         } catch (\Exception $e) {
-            $this->error('Activation failed: ' . $e->getMessage());
+            $this->error('Activation failed: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }

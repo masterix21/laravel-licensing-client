@@ -1,11 +1,11 @@
 <?php
 
-use LucaLongo\LaravelLicensingClient\Services\LicensingApiClient;
-use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
 use Illuminate\Support\Facades\Http;
+use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
+use LucaLongo\LaravelLicensingClient\Services\LicensingApiClient;
 
 beforeEach(function () {
-    $this->apiClient = new LicensingApiClient();
+    $this->apiClient = new LicensingApiClient;
 });
 
 it('activates a license successfully', function () {

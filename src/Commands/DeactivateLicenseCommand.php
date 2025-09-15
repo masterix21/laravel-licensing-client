@@ -15,13 +15,15 @@ class DeactivateLicenseCommand extends Command
     {
         $licenseKey = $this->argument('key') ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             $this->error('License key is required');
+
             return self::FAILURE;
         }
 
-        if (!$this->confirm('Are you sure you want to deactivate this license?')) {
+        if (! $this->confirm('Are you sure you want to deactivate this license?')) {
             $this->info('Deactivation cancelled');
+
             return self::SUCCESS;
         }
 
@@ -30,13 +32,16 @@ class DeactivateLicenseCommand extends Command
         try {
             if ($client->deactivate($licenseKey)) {
                 $this->info('License deactivated successfully!');
+
                 return self::SUCCESS;
             }
 
             $this->error('Failed to deactivate license');
+
             return self::FAILURE;
         } catch (\Exception $e) {
-            $this->error('Deactivation failed: ' . $e->getMessage());
+            $this->error('Deactivation failed: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }

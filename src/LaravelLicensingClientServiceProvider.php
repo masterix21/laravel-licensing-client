@@ -3,22 +3,18 @@
 namespace LucaLongo\LaravelLicensingClient;
 
 use Illuminate\Console\Scheduling\Schedule;
+use LucaLongo\LaravelLicensingClient\Commands\ActivateLicenseCommand;
+use LucaLongo\LaravelLicensingClient\Commands\DeactivateLicenseCommand;
+use LucaLongo\LaravelLicensingClient\Commands\LicenseInfoCommand;
+use LucaLongo\LaravelLicensingClient\Commands\RefreshLicenseCommand;
+use LucaLongo\LaravelLicensingClient\Commands\ValidateLicenseCommand;
+use LucaLongo\LaravelLicensingClient\Http\Middleware\CheckLicense;
+use LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator;
+use LucaLongo\LaravelLicensingClient\Services\LicensingApiClient;
+use LucaLongo\LaravelLicensingClient\Services\TokenStorage;
+use LucaLongo\LaravelLicensingClient\Services\TokenValidator;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use LucaLongo\LaravelLicensingClient\Commands\{
-    ActivateLicenseCommand,
-    DeactivateLicenseCommand,
-    RefreshLicenseCommand,
-    ValidateLicenseCommand,
-    LicenseInfoCommand
-};
-use LucaLongo\LaravelLicensingClient\Http\Middleware\CheckLicense;
-use LucaLongo\LaravelLicensingClient\Services\{
-    FingerprintGenerator,
-    LicensingApiClient,
-    TokenStorage,
-    TokenValidator
-};
 
 class LaravelLicensingClientServiceProvider extends PackageServiceProvider
 {

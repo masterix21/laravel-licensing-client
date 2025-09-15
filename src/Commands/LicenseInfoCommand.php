@@ -15,8 +15,9 @@ class LicenseInfoCommand extends Command
     {
         $licenseKey = $this->argument('key') ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             $this->error('License key is required');
+
             return self::FAILURE;
         }
 
@@ -27,6 +28,7 @@ class LicenseInfoCommand extends Command
 
             if (empty($licenseInfo)) {
                 $this->error('No license information available. Please activate the license first.');
+
                 return self::FAILURE;
             }
 
@@ -37,7 +39,7 @@ class LicenseInfoCommand extends Command
             $this->table(
                 ['Property', 'Value'],
                 [
-                    ['License Key', substr($licenseKey, 0, 8) . '...'],
+                    ['License Key', substr($licenseKey, 0, 8).'...'],
                     ['Customer Name', $licenseInfo['customer_name'] ?? 'N/A'],
                     ['Customer Email', $licenseInfo['customer_email'] ?? 'N/A'],
                     ['Issued At', $licenseInfo['issued_at'] ?? 'N/A'],
@@ -47,7 +49,7 @@ class LicenseInfoCommand extends Command
                 ]
             );
 
-            if (!empty($licenseInfo['features'])) {
+            if (! empty($licenseInfo['features'])) {
                 $this->info('');
                 $this->info('Features:');
                 foreach ($licenseInfo['features'] as $feature) {
@@ -62,7 +64,8 @@ class LicenseInfoCommand extends Command
 
             return self::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('Failed to get license info: ' . $e->getMessage());
+            $this->error('Failed to get license info: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }

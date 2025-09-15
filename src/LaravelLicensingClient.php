@@ -3,12 +3,10 @@
 namespace LucaLongo\LaravelLicensingClient;
 
 use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
-use LucaLongo\LaravelLicensingClient\Services\{
-    FingerprintGenerator,
-    LicensingApiClient,
-    TokenStorage,
-    TokenValidator
-};
+use LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator;
+use LucaLongo\LaravelLicensingClient\Services\LicensingApiClient;
+use LucaLongo\LaravelLicensingClient\Services\TokenStorage;
+use LucaLongo\LaravelLicensingClient\Services\TokenValidator;
 
 class LaravelLicensingClient
 {
@@ -17,8 +15,7 @@ class LaravelLicensingClient
         protected LicensingApiClient $apiClient,
         protected TokenStorage $tokenStorage,
         protected TokenValidator $tokenValidator
-    ) {
-    }
+    ) {}
 
     /**
      * Activate a license
@@ -27,7 +24,7 @@ class LaravelLicensingClient
     {
         $licenseKey = $licenseKey ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             throw LicensingException::invalidConfiguration('No license key provided');
         }
 
@@ -37,7 +34,7 @@ class LaravelLicensingClient
 
             $response = $this->apiClient->activate($licenseKey, $fingerprint, $metadata);
 
-            if (!isset($response['token'])) {
+            if (! isset($response['token'])) {
                 throw LicensingException::activationFailed('No token received from server');
             }
 
@@ -59,7 +56,7 @@ class LaravelLicensingClient
     {
         $licenseKey = $licenseKey ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             return false;
         }
 
@@ -81,14 +78,14 @@ class LaravelLicensingClient
     {
         $licenseKey = $licenseKey ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             return false;
         }
 
         // Try offline validation first
         $token = $this->tokenStorage->retrieve($licenseKey);
 
-        if (!$token) {
+        if (! $token) {
             return false;
         }
 
@@ -102,13 +99,13 @@ class LaravelLicensingClient
     {
         $licenseKey = $licenseKey ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             throw LicensingException::invalidConfiguration('No license key provided');
         }
 
         $token = $this->tokenStorage->retrieve($licenseKey);
 
-        if (!$token) {
+        if (! $token) {
             throw LicensingException::licenseNotActivated();
         }
 
@@ -122,7 +119,7 @@ class LaravelLicensingClient
     {
         $licenseKey = $licenseKey ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             return false;
         }
 
@@ -130,7 +127,7 @@ class LaravelLicensingClient
             $fingerprint = $this->fingerprintGenerator->generate();
             $response = $this->apiClient->refresh($licenseKey, $fingerprint);
 
-            if (!isset($response['token'])) {
+            if (! isset($response['token'])) {
                 return false;
             }
 
@@ -148,18 +145,18 @@ class LaravelLicensingClient
      */
     public function heartbeat(?string $licenseKey = null): bool
     {
-        if (!config('licensing-client.heartbeat.enabled')) {
+        if (! config('licensing-client.heartbeat.enabled')) {
             return true;
         }
 
         $licenseKey = $licenseKey ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             return false;
         }
 
         // Check if heartbeat is needed
-        if (!$this->shouldSendHeartbeat()) {
+        if (! $this->shouldSendHeartbeat()) {
             return true;
         }
 
@@ -192,13 +189,13 @@ class LaravelLicensingClient
     {
         $licenseKey = $licenseKey ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             return [];
         }
 
         $token = $this->tokenStorage->retrieve($licenseKey);
 
-        if (!$token) {
+        if (! $token) {
             return [];
         }
 
@@ -212,13 +209,13 @@ class LaravelLicensingClient
     {
         $licenseKey = $licenseKey ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             return false;
         }
 
         $token = $this->tokenStorage->retrieve($licenseKey);
 
-        if (!$token) {
+        if (! $token) {
             return false;
         }
 
@@ -240,7 +237,7 @@ class LaravelLicensingClient
     {
         $gracePeriodData = $this->tokenStorage->getGracePeriodData();
 
-        if (!$gracePeriodData) {
+        if (! $gracePeriodData) {
             return false;
         }
 
@@ -277,11 +274,12 @@ class LaravelLicensingClient
     {
         $lastHeartbeat = $this->tokenStorage->getLastHeartbeat();
 
-        if (!$lastHeartbeat) {
+        if (! $lastHeartbeat) {
             return true;
         }
 
         $interval = config('licensing-client.heartbeat.interval', 3600);
+
         return time() - $lastHeartbeat >= $interval;
     }
 }

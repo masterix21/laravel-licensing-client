@@ -2,15 +2,17 @@
 
 namespace LucaLongo\LaravelLicensingClient\Services;
 
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Http\Client\RequestException;
 use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
 
 class LicensingApiClient
 {
     protected string $baseUrl;
+
     protected string $apiVersion;
+
     protected int $timeout;
 
     public function __construct()
@@ -120,6 +122,7 @@ class LicensingApiClient
             return $response->json();
         } catch (RequestException $e) {
             $this->logError('Heartbeat failed', $e);
+
             // Don't throw exception for heartbeat failures
             return ['success' => false, 'error' => $e->getMessage()];
         }
@@ -196,6 +199,7 @@ class LicensingApiClient
             return $data['status'] === 'healthy';
         } catch (\Exception $e) {
             $this->logError('Health check failed', $e);
+
             return false;
         }
     }
@@ -205,7 +209,7 @@ class LicensingApiClient
      */
     protected function getEndpoint(string $path): string
     {
-        return "/api/licensing/{$this->apiVersion}/" . ltrim($path, '/');
+        return "/api/licensing/{$this->apiVersion}/".ltrim($path, '/');
     }
 
     /**

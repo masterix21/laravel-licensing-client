@@ -1,16 +1,16 @@
 <?php
 
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
 use LucaLongo\LaravelLicensingClient\Http\Middleware\CheckLicense;
 use LucaLongo\LaravelLicensingClient\LaravelLicensingClient;
-use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
 
 beforeEach(function () {
     $this->client = Mockery::mock(LaravelLicensingClient::class);
     $this->middleware = new CheckLicense($this->client);
     $this->request = Request::create('/test', 'GET');
-    $this->next = fn($request) => response('OK');
+    $this->next = fn ($request) => response('OK');
     config(['licensing-client.license_key' => 'TEST-KEY']);
 });
 
