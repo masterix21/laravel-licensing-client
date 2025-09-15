@@ -274,6 +274,83 @@ php artisan license:deactivate
 php artisan license:deactivate --force
 ```
 
+## Task Scheduling
+
+### Automatic License Maintenance
+
+The package includes automatic license maintenance through Laravel's task scheduler. When heartbeat is enabled, it automatically sends heartbeat signals to keep your license status synchronized with the server.
+
+To enable automatic scheduling, add the following to your `app/Console/Kernel.php`:
+
+```php
+protected function schedule(Schedule $schedule): void
+{
+    // The package automatically schedules heartbeat when enabled in config
+    // No manual configuration needed if heartbeat.enabled is true
+}
+```
+
+The heartbeat runs based on your configuration:
+- **Default interval**: Every 60 minutes (3600 seconds)
+- **Configurable via**: `LICENSING_HEARTBEAT_INTERVAL` environment variable (in seconds)
+
+### Manual License Checks
+
+If you prefer manual control or need additional license checks, you can schedule commands:
+
+```php
+use Illuminate\Console\Scheduling\Schedule;
+
+protected function schedule(Schedule $schedule): void
+{
+    // Validate license daily
+    $schedule->command('license:validate')
+        ->daily()
+        ->onFailure(function () {
+            // Handle invalid license
+            Log::error('License validation failed');
+        });
+
+    // Refresh license token weekly
+    $schedule->command('license:refresh')
+        ->weekly()
+        ->onSuccess(function () {
+            Log::info('License token refreshed successfully');
+        });
+
+    // Check and notify about expiring licenses
+    $schedule->call(function () {
+        if (LaravelLicensingClient::isExpiringSoon(7)) {
+            // Send notification about expiring license
+            Mail::to(config('mail.admin'))->send(new LicenseExpiringSoon());
+        }
+    })->daily();
+}
+```
+
+### Configuration
+
+The scheduling behavior is controlled by these settings in `config/licensing-client.php`:
+
+```php
+'heartbeat' => [
+    'enabled' => env('LICENSING_HEARTBEAT_ENABLED', true),
+    'interval' => env('LICENSING_HEARTBEAT_INTERVAL', 3600), // seconds
+],
+```
+
+To disable automatic heartbeat:
+
+```env
+LICENSING_HEARTBEAT_ENABLED=false
+```
+
+To change heartbeat frequency (e.g., every 30 minutes):
+
+```env
+LICENSING_HEARTBEAT_INTERVAL=1800
+```
+
 ## Grace Period Management
 
 When the licensing server is unreachable, the package automatically enters a grace period:
