@@ -1,24 +1,28 @@
 {
-    "name": ":vendor_slug/:package_slug",
-    "description": ":package_description",
+    "name": "masterix21/laravel-licensing-client",
+    "description": "This is my package laravel-licensing-client",
     "keywords": [
-        ":vendor_name",
+        "Luca Longo",
         "laravel",
-        ":package_slug"
+        "laravel-licensing-client"
     ],
-    "homepage": "https://github.com/:vendor_slug/:package_slug",
+    "homepage": "https://github.com/masterix21/laravel-licensing-client",
     "license": "MIT",
     "authors": [
         {
-            "name": ":author_name",
-            "email": "author@domain.com",
+            "name": "Luca Longo",
+            "email": "l.longo@ambita.it",
             "role": "Developer"
         }
     ],
     "require": {
-        "php": "^8.4",
+        "php": "^8.2",
         "spatie/laravel-package-tools": "^1.16",
-        "illuminate/contracts": "^11.0||^12.0"
+        "illuminate/contracts": "^12.0",
+        "illuminate/support": "^12.0",
+        "illuminate/http": "^12.0",
+        "guzzlehttp/guzzle": "^7.8",
+        "paragonie/paseto": "^3.2"
     },
     "require-dev": {
         "laravel/pint": "^1.14",
@@ -31,17 +35,18 @@
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan-deprecation-rules": "^2.0",
         "phpstan/phpstan-phpunit": "^2.0",
-        "spatie/laravel-ray": "^1.35"
+        "masterix21/laravel-licensing": "dev-main",
+        "mockery/mockery": "^1.6"
     },
     "autoload": {
         "psr-4": {
-            "VendorName\\Skeleton\\": "src/",
-            "VendorName\\Skeleton\\Database\\Factories\\": "database/factories/"
+            "LucaLongo\\LaravelLicensingClient\\": "src/",
+            "LucaLongo\\LaravelLicensingClient\\Database\\Factories\\": "database/factories/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "VendorName\\Skeleton\\Tests\\": "tests/",
+            "LucaLongo\\LaravelLicensingClient\\Tests\\": "tests/",
             "Workbench\\App\\": "workbench/app/"
         }
     },
@@ -63,10 +68,10 @@
     "extra": {
         "laravel": {
             "providers": [
-                "VendorName\\Skeleton\\SkeletonServiceProvider"
+                "LucaLongo\\LaravelLicensingClient\\LaravelLicensingClientServiceProvider"
             ],
             "aliases": {
-                "Skeleton": "VendorName\\Skeleton\\Facades\\Skeleton"
+                "LaravelLicensingClient": "LucaLongo\\LaravelLicensingClient\\Facades\\LaravelLicensingClient"
             }
         }
     },
