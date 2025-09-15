@@ -59,7 +59,7 @@ class TokenStorage
         // Fall back to file storage
         $filename = $this->getTokenFilename($key);
 
-        if (!File::exists($filename)) {
+        if (! File::exists($filename)) {
             return null;
         }
 
@@ -114,7 +114,7 @@ class TokenStorage
      */
     public function storeLastHeartbeat(): void
     {
-        $filename = $this->storagePath . '/last_heartbeat';
+        $filename = $this->storagePath.'/last_heartbeat';
         File::put($filename, (string) time());
     }
 
@@ -123,9 +123,9 @@ class TokenStorage
      */
     public function getLastHeartbeat(): ?int
     {
-        $filename = $this->storagePath . '/last_heartbeat';
+        $filename = $this->storagePath.'/last_heartbeat';
 
-        if (!File::exists($filename)) {
+        if (! File::exists($filename)) {
             return null;
         }
 
@@ -137,7 +137,7 @@ class TokenStorage
      */
     public function storeGracePeriodData(array $data): void
     {
-        $filename = $this->storagePath . '/grace_period.json';
+        $filename = $this->storagePath.'/grace_period.json';
         File::put($filename, json_encode($data));
     }
 
@@ -146,9 +146,9 @@ class TokenStorage
      */
     public function getGracePeriodData(): ?array
     {
-        $filename = $this->storagePath . '/grace_period.json';
+        $filename = $this->storagePath.'/grace_period.json';
 
-        if (!File::exists($filename)) {
+        if (! File::exists($filename)) {
             return null;
         }
 
@@ -177,7 +177,7 @@ class TokenStorage
      */
     protected function ensureStorageDirectoryExists(): void
     {
-        if (!File::isDirectory($this->storagePath)) {
+        if (! File::isDirectory($this->storagePath)) {
             File::makeDirectory($this->storagePath, 0755, true);
         }
     }
@@ -187,7 +187,7 @@ class TokenStorage
      */
     protected function getTokenFilename(string $key): string
     {
-        return $this->storagePath . '/' . hash('sha256', $key) . '.token';
+        return $this->storagePath.'/'.hash('sha256', $key).'.token';
     }
 
     /**
@@ -195,6 +195,6 @@ class TokenStorage
      */
     protected function getCacheKey(string $key): string
     {
-        return 'licensing:token:' . $key;
+        return 'licensing:token:'.$key;
     }
 }

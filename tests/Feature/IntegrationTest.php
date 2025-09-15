@@ -1,9 +1,9 @@
 <?php
 
-use LucaLongo\LaravelLicensingClient\Facades\LaravelLicensingClient;
-use LucaLongo\LaravelLicensingClient\Services\TokenStorage;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
+use LucaLongo\LaravelLicensingClient\Facades\LaravelLicensingClient;
+use LucaLongo\LaravelLicensingClient\Services\TokenStorage;
 
 it('can complete a full license lifecycle', function () {
     // Mock HTTP responses
@@ -179,7 +179,7 @@ it('can use middleware to protect routes', function () {
     LaravelLicensingClient::activate('MIDDLEWARE-TEST-KEY');
 
     // Create a test route with middleware
-    Route::middleware('license')->get('/protected', fn() => 'Protected content');
+    Route::middleware('license')->get('/protected', fn () => 'Protected content');
 
     $response = $this->get('/protected');
     $response->assertStatus(200);
@@ -196,7 +196,7 @@ it('blocks access when license is invalid via middleware', function () {
         '*/api/licensing/v1/refresh' => Http::response(['error' => 'Invalid license'], 404),
     ]);
 
-    Route::middleware('license')->get('/protected', fn() => 'Protected content');
+    Route::middleware('license')->get('/protected', fn () => 'Protected content');
 
     $response = $this->get('/protected');
     $response->assertStatus(403);
@@ -205,7 +205,7 @@ it('blocks access when license is invalid via middleware', function () {
 it('allows excluded routes without license check', function () {
     config(['licensing-client.excluded_routes' => ['public/*']]);
 
-    Route::middleware('license')->get('/public/page', fn() => 'Public content');
+    Route::middleware('license')->get('/public/page', fn () => 'Public content');
 
     $response = $this->get('/public/page');
     $response->assertStatus(200);

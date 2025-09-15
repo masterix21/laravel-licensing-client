@@ -15,8 +15,9 @@ class RefreshLicenseCommand extends Command
     {
         $licenseKey = $this->argument('key') ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             $this->error('License key is required');
+
             return self::FAILURE;
         }
 
@@ -25,13 +26,16 @@ class RefreshLicenseCommand extends Command
         try {
             if ($client->refresh($licenseKey)) {
                 $this->info('License token refreshed successfully!');
+
                 return self::SUCCESS;
             }
 
             $this->error('Failed to refresh license token');
+
             return self::FAILURE;
         } catch (\Exception $e) {
-            $this->error('Token refresh failed: ' . $e->getMessage());
+            $this->error('Token refresh failed: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }

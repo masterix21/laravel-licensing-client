@@ -4,15 +4,17 @@ namespace LucaLongo\LaravelLicensingClient\Tests;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\File;
-use Orchestra\Testbench\TestCase as Orchestra;
 use LucaLongo\LaravelLicensingClient\LaravelLicensingClientServiceProvider;
-use ParagonIE\Paseto\Keys\AsymmetricSecretKey;
+use Orchestra\Testbench\TestCase as Orchestra;
 use ParagonIE\Paseto\Keys\AsymmetricPublicKey;
+use ParagonIE\Paseto\Keys\AsymmetricSecretKey;
 
 class TestCase extends Orchestra
 {
     protected ?AsymmetricSecretKey $privateKey = null;
+
     protected ?AsymmetricPublicKey $publicKey = null;
+
     protected ?string $testStoragePath = null;
 
     protected function setUp(): void
@@ -71,13 +73,13 @@ class TestCase extends Orchestra
 
     protected function initializeTestProperties(): void
     {
-        if (!$this->privateKey) {
+        if (! $this->privateKey) {
             // Generate test keys for PASETO v4
-            $this->privateKey = AsymmetricSecretKey::generate(new \ParagonIE\Paseto\Protocol\Version4());
+            $this->privateKey = AsymmetricSecretKey::generate(new \ParagonIE\Paseto\Protocol\Version4);
             $this->publicKey = $this->privateKey->getPublicKey();
 
             // Set test storage path
-            $this->testStoragePath = sys_get_temp_dir() . '/licensing-test-' . uniqid();
+            $this->testStoragePath = sys_get_temp_dir().'/licensing-test-'.uniqid();
             File::makeDirectory($this->testStoragePath, 0755, true);
         }
     }
@@ -85,7 +87,7 @@ class TestCase extends Orchestra
     protected function generateTestToken(array $claims = []): string
     {
         $this->initializeTestProperties();
-        $builder = \ParagonIE\Paseto\Builder::getPublic($this->privateKey, new \ParagonIE\Paseto\Protocol\Version4());
+        $builder = \ParagonIE\Paseto\Builder::getPublic($this->privateKey, new \ParagonIE\Paseto\Protocol\Version4);
 
         $defaultClaims = [
             'license_key' => 'TEST-LICENSE-KEY',

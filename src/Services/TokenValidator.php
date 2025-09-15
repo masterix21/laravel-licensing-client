@@ -3,17 +3,16 @@
 namespace LucaLongo\LaravelLicensingClient\Services;
 
 use Carbon\Carbon;
+use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
 use ParagonIE\Paseto\Keys\AsymmetricPublicKey;
 use ParagonIE\Paseto\Parser;
-use ParagonIE\Paseto\ProtocolCollection;
 use ParagonIE\Paseto\Protocol\Version4;
-use ParagonIE\Paseto\Purpose;
-use ParagonIE\Paseto\Rules\IssuedBy;
-use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
+use ParagonIE\Paseto\ProtocolCollection;
 
 class TokenValidator
 {
     protected ?AsymmetricPublicKey $publicKey = null;
+
     protected Parser $parser;
 
     public function __construct(
@@ -27,7 +26,7 @@ class TokenValidator
      */
     public function validate(string $token): array
     {
-        if (!$this->publicKey) {
+        if (! $this->publicKey) {
             throw LicensingException::publicKeyMissing();
         }
 
@@ -36,17 +35,17 @@ class TokenValidator
             $claims = $parsedToken->getClaims();
 
             // Validate fingerprint
-            if (!$this->validateFingerprint($claims)) {
+            if (! $this->validateFingerprint($claims)) {
                 throw LicensingException::fingerprintMismatch();
             }
 
             // Validate expiration
-            if (!$this->validateExpiration($claims)) {
+            if (! $this->validateExpiration($claims)) {
                 throw LicensingException::licenseExpired();
             }
 
             // Validate usage limits
-            if (!$this->validateUsageLimits($claims)) {
+            if (! $this->validateUsageLimits($claims)) {
                 throw LicensingException::usageLimitExceeded();
             }
 
@@ -72,6 +71,7 @@ class TokenValidator
     {
         try {
             $this->validate($token);
+
             return true;
         } catch (\Exception $e) {
             return false;
@@ -86,7 +86,7 @@ class TokenValidator
         try {
             $claims = $this->validate($token);
 
-            if (!isset($claims['exp'])) {
+            if (! isset($claims['exp'])) {
                 return null;
             }
 
@@ -103,13 +103,14 @@ class TokenValidator
     {
         $expiration = $this->getExpiration($token);
 
-        if (!$expiration) {
+        if (! $expiration) {
             return false;
         }
 
         // Check if token is expiring within the threshold but hasn't expired yet
         $now = now();
         $daysUntilExpiration = $now->diffInDays($expiration, false);
+
         return $daysUntilExpiration > 0 && $daysUntilExpiration <= $daysThreshold;
     }
 
@@ -144,12 +145,12 @@ class TokenValidator
     {
         $publicKeyString = config('licensing-client.public_key');
 
-        if (!$publicKeyString) {
+        if (! $publicKeyString) {
             return;
         }
 
         try {
-            $this->publicKey = AsymmetricPublicKey::fromEncodedString($publicKeyString, new Version4());
+            $this->publicKey = AsymmetricPublicKey::fromEncodedString($publicKeyString, new Version4);
 
             $this->parser = Parser::getPublic($this->publicKey, ProtocolCollection::v4());
         } catch (\Exception $e) {
@@ -162,11 +163,12 @@ class TokenValidator
      */
     protected function validateFingerprint(array $claims): bool
     {
-        if (!isset($claims['fingerprint'])) {
+        if (! isset($claims['fingerprint'])) {
             return false;
         }
 
         $currentFingerprint = $this->fingerprintGenerator->generate();
+
         return hash_equals($claims['fingerprint'], $currentFingerprint);
     }
 
@@ -175,7 +177,7 @@ class TokenValidator
      */
     protected function validateExpiration(array $claims): bool
     {
-        if (!isset($claims['exp'])) {
+        if (! isset($claims['exp'])) {
             return true; // No expiration means perpetual license
         }
 
@@ -187,7 +189,7 @@ class TokenValidator
      */
     protected function validateUsageLimits(array $claims): bool
     {
-        if (!isset($claims['max_usages']) || !isset($claims['current_usages'])) {
+        if (! isset($claims['max_usages']) || ! isset($claims['current_usages'])) {
             return true; // No usage limits
         }
 

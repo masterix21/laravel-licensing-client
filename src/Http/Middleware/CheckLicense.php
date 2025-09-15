@@ -11,8 +11,7 @@ class CheckLicense
 {
     public function __construct(
         protected LaravelLicensingClient $client
-    ) {
-    }
+    ) {}
 
     /**
      * Handle an incoming request
@@ -28,14 +27,15 @@ class CheckLicense
 
         try {
             // Try to validate the license
-            if (!$this->client->isValid($licenseKey)) {
+            if (! $this->client->isValid($licenseKey)) {
                 // Try to refresh the token
-                if (!$this->client->refresh($licenseKey)) {
+                if (! $this->client->refresh($licenseKey)) {
                     // Check if we're in grace period
-                    if (!$this->client->isInGracePeriod()) {
+                    if (! $this->client->isInGracePeriod()) {
                         // Server might be unreachable, check health
-                        if (!$this->client->isServerHealthy()) {
+                        if (! $this->client->isServerHealthy()) {
                             $this->client->startGracePeriod();
+
                             return $next($request);
                         }
 

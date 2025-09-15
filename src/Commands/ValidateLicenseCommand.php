@@ -15,8 +15,9 @@ class ValidateLicenseCommand extends Command
     {
         $licenseKey = $this->argument('key') ?? config('licensing-client.license_key');
 
-        if (!$licenseKey) {
+        if (! $licenseKey) {
             $this->error('License key is required');
+
             return self::FAILURE;
         }
 
@@ -34,9 +35,11 @@ class ValidateLicenseCommand extends Command
             }
 
             $this->error('✗ License is invalid');
+
             return self::FAILURE;
         } catch (\Exception $e) {
-            $this->error('Validation failed: ' . $e->getMessage());
+            $this->error('Validation failed: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }

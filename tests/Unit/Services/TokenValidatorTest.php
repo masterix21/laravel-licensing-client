@@ -1,12 +1,12 @@
 <?php
 
-use LucaLongo\LaravelLicensingClient\Services\TokenValidator;
-use LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator;
-use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
 use Carbon\Carbon;
+use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
+use LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator;
+use LucaLongo\LaravelLicensingClient\Services\TokenValidator;
 
 beforeEach(function () {
-    $this->fingerprintGenerator = new FingerprintGenerator();
+    $this->fingerprintGenerator = new FingerprintGenerator;
     $this->validator = new TokenValidator($this->fingerprintGenerator);
 });
 

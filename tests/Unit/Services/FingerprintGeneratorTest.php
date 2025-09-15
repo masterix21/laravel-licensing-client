@@ -3,7 +3,7 @@
 use LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator;
 
 it('generates a consistent fingerprint', function () {
-    $generator = new FingerprintGenerator();
+    $generator = new FingerprintGenerator;
 
     $fingerprint1 = $generator->generate();
     $fingerprint2 = $generator->generate();
@@ -12,7 +12,7 @@ it('generates a consistent fingerprint', function () {
 });
 
 it('generates a valid sha256 hash', function () {
-    $generator = new FingerprintGenerator();
+    $generator = new FingerprintGenerator;
 
     $fingerprint = $generator->generate();
 
@@ -20,7 +20,7 @@ it('generates a valid sha256 hash', function () {
 });
 
 it('returns metadata with expected keys', function () {
-    $generator = new FingerprintGenerator();
+    $generator = new FingerprintGenerator;
 
     $metadata = $generator->getMetadata();
 
@@ -35,7 +35,7 @@ it('returns metadata with expected keys', function () {
 });
 
 it('includes hostname in metadata', function () {
-    $generator = new FingerprintGenerator();
+    $generator = new FingerprintGenerator;
 
     $metadata = $generator->getMetadata();
 
@@ -43,7 +43,7 @@ it('includes hostname in metadata', function () {
 });
 
 it('includes PHP version in metadata', function () {
-    $generator = new FingerprintGenerator();
+    $generator = new FingerprintGenerator;
 
     $metadata = $generator->getMetadata();
 
@@ -51,7 +51,7 @@ it('includes PHP version in metadata', function () {
 });
 
 it('includes OS family in metadata', function () {
-    $generator = new FingerprintGenerator();
+    $generator = new FingerprintGenerator;
 
     $metadata = $generator->getMetadata();
 

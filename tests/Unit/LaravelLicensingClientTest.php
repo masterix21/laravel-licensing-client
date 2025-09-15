@@ -1,14 +1,11 @@
 <?php
 
-use LucaLongo\LaravelLicensingClient\LaravelLicensingClient;
-use LucaLongo\LaravelLicensingClient\Services\{
-    FingerprintGenerator,
-    LicensingApiClient,
-    TokenStorage,
-    TokenValidator
-};
 use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
-use Mockery\MockInterface;
+use LucaLongo\LaravelLicensingClient\LaravelLicensingClient;
+use LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator;
+use LucaLongo\LaravelLicensingClient\Services\LicensingApiClient;
+use LucaLongo\LaravelLicensingClient\Services\TokenStorage;
+use LucaLongo\LaravelLicensingClient\Services\TokenValidator;
 
 beforeEach(function () {
     $this->fingerprintGenerator = Mockery::mock(FingerprintGenerator::class);

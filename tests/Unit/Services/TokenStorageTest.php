@@ -1,11 +1,11 @@
 <?php
 
-use LucaLongo\LaravelLicensingClient\Services\TokenStorage;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
+use LucaLongo\LaravelLicensingClient\Services\TokenStorage;
 
 beforeEach(function () {
-    $this->storage = new TokenStorage();
+    $this->storage = new TokenStorage;
 });
 
 it('stores and retrieves a token', function () {
@@ -25,7 +25,7 @@ it('encrypts token when storing', function () {
     $this->storage->store($token, $key);
 
     $storagePath = config('licensing-client.storage_path');
-    $filename = $storagePath . '/' . hash('sha256', $key) . '.token';
+    $filename = $storagePath.'/'.hash('sha256', $key).'.token';
 
     $storedContent = File::get($filename);
 
@@ -107,7 +107,7 @@ it('caches token when cache is enabled', function () {
 
     $this->storage->store($token, $key);
 
-    $cacheKey = 'licensing:token:' . $key;
+    $cacheKey = 'licensing:token:'.$key;
     $cached = Cache::store('array')->get($cacheKey);
 
     expect($cached)->toBe($token);
@@ -118,7 +118,7 @@ it('retrieves from cache first when available', function () {
 
     $token = 'cached-token';
     $key = 'cache-retrieve-test';
-    $cacheKey = 'licensing:token:' . $key;
+    $cacheKey = 'licensing:token:'.$key;
 
     // Store directly in cache
     Cache::store('array')->put($cacheKey, $token, 3600);
