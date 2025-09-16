@@ -26,36 +26,48 @@ class CheckLicense
         $licenseKey = config('licensing-client.license_key');
 
         try {
-            // Try to validate the license
-            if (! $this->client->isValid($licenseKey)) {
-                // Try to refresh the token
-                if (! $this->client->refresh($licenseKey)) {
-                    // Check if we're in grace period
-                    if (! $this->client->isInGracePeriod()) {
-                        // Server might be unreachable, check health
-                        if (! $this->client->isServerHealthy()) {
-                            $this->client->startGracePeriod();
-
-                            return $next($request);
-                        }
-
-                        return $this->handleInvalidLicense($request);
-                    }
-                }
+            // If license is valid, continue with normal flow
+            if ($this->client->isValid($licenseKey)) {
+                return $this->continueWithValidLicense($request, $next, $licenseKey);
             }
 
-            // Send heartbeat if needed
-            $this->client->heartbeat($licenseKey);
-
-            // Check if license is expiring soon
-            if ($this->client->isExpiringSoon(7, $licenseKey)) {
-                $this->addExpirationWarning($request);
+            // Try to refresh the token
+            if ($this->client->refresh($licenseKey)) {
+                return $this->continueWithValidLicense($request, $next, $licenseKey);
             }
 
-            return $next($request);
+            // Check if we're in grace period
+            if ($this->client->isInGracePeriod()) {
+                return $this->continueWithValidLicense($request, $next, $licenseKey);
+            }
+
+            // Server might be unreachable, check health
+            if (! $this->client->isServerHealthy()) {
+                $this->client->startGracePeriod();
+
+                return $next($request);
+            }
+
+            return $this->handleInvalidLicense($request);
         } catch (LicensingException $e) {
             return $this->handleLicenseException($request, $e);
         }
+    }
+
+    /**
+     * Continue with valid license processing
+     */
+    protected function continueWithValidLicense(Request $request, Closure $next, string $licenseKey): mixed
+    {
+        // Send heartbeat if needed
+        $this->client->heartbeat($licenseKey);
+
+        // Check if license is expiring soon
+        if ($this->client->isExpiringSoon(7, $licenseKey)) {
+            $this->addExpirationWarning($request);
+        }
+
+        return $next($request);
     }
 
     /**
