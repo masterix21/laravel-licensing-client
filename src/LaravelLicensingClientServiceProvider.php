@@ -67,9 +67,16 @@ class LaravelLicensingClientServiceProvider extends PackageServiceProvider
                 $interval = config('licensing-client.heartbeat.interval', 3600);
                 $minutes = max(1, (int) round($interval / 60));
 
-                $schedule->call(function () {
+                $task = $schedule->call(function () {
                     app(LaravelLicensingClient::class)->heartbeat();
-                })->everyXMinutes($minutes);
+                });
+
+                // Use cron expression for custom minute intervals
+                if ($minutes === 1) {
+                    $task->everyMinute();
+                } else {
+                    $task->cron("*/{$minutes} * * * *");
+                }
             });
         }
     }
