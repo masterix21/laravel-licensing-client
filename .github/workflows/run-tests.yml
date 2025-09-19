@@ -50,7 +50,7 @@ jobs:
         run: |
           composer require "laravel/framework:${{ matrix.laravel }}" --no-interaction --no-update
           composer require --dev "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
-          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+          composer update --${{ matrix.stability }} --prefer-dist --no-interaction --prefer-stable
 
       - name: List Installed Dependencies
         run: composer show -D
