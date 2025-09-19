@@ -65,10 +65,11 @@ class LaravelLicensingClientServiceProvider extends PackageServiceProvider
             $this->app->booted(function () {
                 $schedule = $this->app->make(Schedule::class);
                 $interval = config('licensing-client.heartbeat.interval', 3600);
+                $minutes = max(1, (int) round($interval / 60));
 
                 $schedule->call(function () {
                     app(LaravelLicensingClient::class)->heartbeat();
-                })->everyMinutes($interval / 60);
+                })->everyXMinutes($minutes);
             });
         }
     }
