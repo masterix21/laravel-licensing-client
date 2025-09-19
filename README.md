@@ -1,9 +1,9 @@
 # Laravel Licensing Client
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/lucalongo/laravel-licensing-client.svg?style=flat-square)](https://packagist.org/packages/lucalongo/laravel-licensing-client)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/masterix21/laravel-licensing-client.svg?style=flat-square)](https://packagist.org/packages/masterix21/laravel-licensing-client)
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/masterix21/laravel-licensing-client/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/masterix21/laravel-licensing-client/actions?query=workflow%3Arun-tests+branch%3Amain)
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/masterix21/laravel-licensing-client/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/masterix21/laravel-licensing-client/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
-[![Total Downloads](https://img.shields.io/packagist/dt/lucalongo/laravel-licensing-client.svg?style=flat-square)](https://packagist.org/packages/lucalongo/laravel-licensing-client)
+[![Total Downloads](https://img.shields.io/packagist/dt/masterix21/laravel-licensing-client.svg?style=flat-square)](https://packagist.org/packages/masterix21/laravel-licensing-client)
 
 A comprehensive Laravel package for integrating license validation in your applications. This client package works seamlessly with the [Laravel Licensing](https://github.com/masterix21/laravel-licensing) server to provide secure, offline-capable license management using PASETO v4 tokens.
 
@@ -40,7 +40,7 @@ This package is part of the Laravel Licensing ecosystem:
 Install the package via Composer:
 
 ```bash
-composer require lucalongo/laravel-licensing-client
+composer require masterix21/laravel-licensing-client
 ```
 
 Publish the configuration file:
