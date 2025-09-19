@@ -1,6 +1,22 @@
 # Laravel Licensing Client
 
-A comprehensive Laravel package for integrating license validation in your applications. This client package works with the [masterix21/laravel-licensing](https://github.com/masterix21/laravel-licensing) server to provide secure, offline-capable license management using PASETO v4 tokens.
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/lucalongo/laravel-licensing-client.svg?style=flat-square)](https://packagist.org/packages/lucalongo/laravel-licensing-client)
+[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/masterix21/laravel-licensing-client/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/masterix21/laravel-licensing-client/actions?query=workflow%3Arun-tests+branch%3Amain)
+[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/masterix21/laravel-licensing-client/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/masterix21/laravel-licensing-client/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
+[![Total Downloads](https://img.shields.io/packagist/dt/lucalongo/laravel-licensing-client.svg?style=flat-square)](https://packagist.org/packages/lucalongo/laravel-licensing-client)
+
+A comprehensive Laravel package for integrating license validation in your applications. This client package works seamlessly with the [Laravel Licensing](https://github.com/masterix21/laravel-licensing) server to provide secure, offline-capable license management using PASETO v4 tokens.
+
+## Sponsorship
+
+⭐ **Support this project!** If you find this package helpful, please consider [sponsoring the development](https://github.com/sponsors/masterix21) to help maintain and improve it.
+
+## Related Packages
+
+This package is part of the Laravel Licensing ecosystem:
+
+- **[Laravel Licensing Server](https://github.com/masterix21/laravel-licensing)** - The server-side package that manages licenses, activations, and validations
+- **[Laravel Licensing Filament Manager](https://github.com/masterix21/laravel-licensing-filament-manager)** - A complete admin panel built with Filament for managing licenses through a user-friendly interface
 
 ## Features
 
@@ -656,12 +672,15 @@ This package is open-sourced software licensed under the [MIT license](LICENSE.m
 
 ## Support
 
-For issues and questions, please use the [GitHub issue tracker](https://github.com/lucalongo/laravel-licensing-client/issues).
+For issues and questions, please use the [GitHub issue tracker](https://github.com/masterix21/laravel-licensing-client/issues).
+
+Consider [sponsoring this project](https://github.com/sponsors/masterix21) if you use it in production!
 
 ## Credits
 
-- [Luca Longo](https://github.com/lucalongo)
-- Built to work with [masterix21/laravel-licensing](https://github.com/masterix21/laravel-licensing)
+- [Luca Longo](https://github.com/masterix21)
+- Built to work with [Laravel Licensing](https://github.com/masterix21/laravel-licensing) server
+- Admin interface available via [Laravel Licensing Filament Manager](https://github.com/masterix21/laravel-licensing-filament-manager)
 
 ## Changelog
 
