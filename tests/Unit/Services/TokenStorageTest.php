@@ -127,3 +127,33 @@ it('retrieves from cache first when available', function () {
 
     expect($retrieved)->toBe($token);
 });
+
+it('stores and retrieves public key bundle', function () {
+    $bundle = [
+        'signing' => ['kid' => 'signing-1', 'public_key' => 'base64key'],
+        'root' => ['kid' => 'root-1', 'public_key' => 'base64rootkey'],
+        'issued_at' => '2027-01-01T00:00:00+00:00',
+    ];
+
+    $this->storage->storePublicKeyBundle($bundle);
+    $retrieved = $this->storage->getPublicKeyBundle();
+
+    expect($retrieved)->toBe($bundle);
+});
+
+it('returns null when no public key bundle stored', function () {
+    expect($this->storage->getPublicKeyBundle())->toBeNull();
+});
+
+it('stores and retrieves refresh_after', function () {
+    $refreshAfter = '2027-01-07T00:00:00+00:00';
+
+    $this->storage->storeRefreshAfter($refreshAfter);
+    $retrieved = $this->storage->getRefreshAfter();
+
+    expect($retrieved)->toBe($refreshAfter);
+});
+
+it('returns null when no refresh_after stored', function () {
+    expect($this->storage->getRefreshAfter())->toBeNull();
+});

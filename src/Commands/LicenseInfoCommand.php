@@ -32,34 +32,32 @@ class LicenseInfoCommand extends Command
                 return self::FAILURE;
             }
 
-            $this->info('');
-            $this->info('🌟 License Information:');
-            $this->info('');
+            $this->newLine();
+            $this->info('License Information:');
+            $this->newLine();
 
             $this->table(
                 ['Property', 'Value'],
                 [
                     ['License Key', substr($licenseKey, 0, 8).'...'],
-                    ['Customer Name', $licenseInfo['customer_name'] ?? 'N/A'],
-                    ['Customer Email', $licenseInfo['customer_email'] ?? 'N/A'],
+                    ['Status', $licenseInfo['status'] ?? 'N/A'],
                     ['Issued At', $licenseInfo['issued_at'] ?? 'N/A'],
-                    ['Expires At', $licenseInfo['expires_at'] ?? 'Never'],
+                    ['Token Expires At', $licenseInfo['expires_at'] ?? 'Never'],
+                    ['License Expires At', $licenseInfo['license_expires_at'] ?? 'Never'],
                     ['Max Usages', $licenseInfo['max_usages'] ?? 'Unlimited'],
-                    ['Current Usages', $licenseInfo['current_usages'] ?? '0'],
+                    ['Force Online After', $licenseInfo['force_online_after'] ?? 'N/A'],
+                    ['Grace Until', $licenseInfo['grace_until'] ?? 'N/A'],
                 ]
             );
 
-            if (! empty($licenseInfo['features'])) {
-                $this->info('');
-                $this->info('Features:');
-                foreach ($licenseInfo['features'] as $feature) {
-                    $this->info("  ✓ {$feature}");
-                }
+            if ($client->isExpiringSoon(7, $licenseKey)) {
+                $this->newLine();
+                $this->warn('Warning: License is expiring soon!');
             }
 
-            if ($client->isExpiringSoon(7, $licenseKey)) {
-                $this->warn('');
-                $this->warn('⚠ License is expiring soon!');
+            if ($client->requiresOnlineRefresh($licenseKey)) {
+                $this->newLine();
+                $this->warn('Warning: Online refresh is required!');
             }
 
             return self::SUCCESS;

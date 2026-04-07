@@ -17,9 +17,14 @@ return [
     'license_key' => env('LICENSING_KEY'),
 
     /**
-     * Public key for PASETO token verification
+     * Public key for PASETO token verification (base64-encoded Ed25519 public key)
      */
     'public_key' => env('LICENSING_PUBLIC_KEY'),
+
+    /**
+     * Expected token issuer (must match the server's configured issuer)
+     */
+    'issuer' => env('LICENSING_ISSUER', 'laravel-licensing'),
 
     /**
      * Cache configuration

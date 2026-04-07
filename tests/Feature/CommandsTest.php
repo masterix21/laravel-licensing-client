@@ -15,9 +15,9 @@ it('can activate a license via command', function () {
         ->with('TEST-LICENSE-KEY')
         ->once()
         ->andReturn([
-            'customer_name' => 'John Doe',
-            'customer_email' => 'john@example.com',
-            'expires_at' => '2025-12-31',
+            'status' => 'active',
+            'license_expires_at' => '2027-12-31',
+            'expires_at' => '2027-01-07',
             'max_usages' => 5,
         ]);
 
@@ -27,9 +27,9 @@ it('can activate a license via command', function () {
         ->expectsTable(
             ['Property', 'Value'],
             [
-                ['Customer', 'John Doe'],
-                ['Email', 'john@example.com'],
-                ['Expires', '2025-12-31'],
+                ['Status', 'active'],
+                ['License Expires', '2027-12-31'],
+                ['Token Expires', '2027-01-07'],
                 ['Max Usages', 5],
             ]
         )
@@ -116,13 +116,13 @@ it('can display license information via command', function () {
         ->with('TEST-LICENSE-KEY')
         ->once()
         ->andReturn([
-            'customer_name' => 'John Doe',
-            'customer_email' => 'john@example.com',
+            'status' => 'active',
             'issued_at' => '2024-01-01',
             'expires_at' => '2025-12-31',
+            'license_expires_at' => '2025-12-31',
             'max_usages' => 5,
-            'current_usages' => 2,
-            'features' => ['feature1', 'feature2'],
+            'force_online_after' => '2025-01-14',
+            'grace_until' => null,
         ]);
 
     $client->shouldReceive('isExpiringSoon')
@@ -130,24 +130,27 @@ it('can display license information via command', function () {
         ->once()
         ->andReturn(false);
 
+    $client->shouldReceive('requiresOnlineRefresh')
+        ->with('TEST-LICENSE-KEY')
+        ->once()
+        ->andReturn(false);
+
     $this->artisan('license:info', ['key' => 'TEST-LICENSE-KEY'])
         ->expectsOutput('Fetching license information...')
-        ->expectsOutput('🌟 License Information:')
+        ->expectsOutput('License Information:')
         ->expectsTable(
             ['Property', 'Value'],
             [
                 ['License Key', 'TEST-LIC...'],
-                ['Customer Name', 'John Doe'],
-                ['Customer Email', 'john@example.com'],
+                ['Status', 'active'],
                 ['Issued At', '2024-01-01'],
-                ['Expires At', '2025-12-31'],
+                ['Token Expires At', '2025-12-31'],
+                ['License Expires At', '2025-12-31'],
                 ['Max Usages', 5],
-                ['Current Usages', 2],
+                ['Force Online After', '2025-01-14'],
+                ['Grace Until', 'N/A'],
             ]
         )
-        ->expectsOutput('Features:')
-        ->expectsOutput('  ✓ feature1')
-        ->expectsOutput('  ✓ feature2')
         ->assertSuccessful();
 });
 
@@ -186,6 +189,112 @@ it('prompts for license key when not provided', function () {
         ->expectsQuestion('Please enter your license key', 'PROMPTED-KEY')
         ->expectsOutput('Activating license...')
         ->expectsOutput('License activated successfully!')
+        ->assertSuccessful();
+});
+
+it('shows error when deactivation fails', function () {
+    $client = Mockery::mock(LaravelLicensingClient::class);
+    $this->app->instance(LaravelLicensingClient::class, $client);
+
+    $client->shouldReceive('deactivate')
+        ->once()
+        ->andReturn(false);
+
+    $this->artisan('license:deactivate', ['key' => 'TEST-KEY'])
+        ->expectsQuestion('Are you sure you want to deactivate this license?', true)
+        ->expectsOutput('Deactivating license...')
+        ->expectsOutput('Failed to deactivate license')
+        ->assertFailed();
+});
+
+it('cancels deactivation when user declines', function () {
+    $client = Mockery::mock(LaravelLicensingClient::class);
+    $this->app->instance(LaravelLicensingClient::class, $client);
+
+    $client->shouldNotReceive('deactivate');
+
+    $this->artisan('license:deactivate', ['key' => 'TEST-KEY'])
+        ->expectsQuestion('Are you sure you want to deactivate this license?', false)
+        ->expectsOutput('Deactivation cancelled')
+        ->assertSuccessful();
+});
+
+it('shows error when refresh fails', function () {
+    $client = Mockery::mock(LaravelLicensingClient::class);
+    $this->app->instance(LaravelLicensingClient::class, $client);
+
+    $client->shouldReceive('refresh')
+        ->once()
+        ->andReturn(false);
+
+    $this->artisan('license:refresh', ['key' => 'TEST-KEY'])
+        ->expectsOutput('Refreshing license token...')
+        ->expectsOutput('Failed to refresh license token')
+        ->assertFailed();
+});
+
+it('shows error when validation fails', function () {
+    $client = Mockery::mock(LaravelLicensingClient::class);
+    $this->app->instance(LaravelLicensingClient::class, $client);
+
+    $client->shouldReceive('isValid')
+        ->once()
+        ->andReturn(false);
+
+    $this->artisan('license:validate', ['key' => 'TEST-KEY'])
+        ->expectsOutput('Validating license...')
+        ->expectsOutput('✗ License is invalid')
+        ->assertFailed();
+});
+
+it('shows error when no license key for validation', function () {
+    config(['licensing-client.license_key' => null]);
+
+    $this->artisan('license:validate')
+        ->expectsOutput('License key is required')
+        ->assertFailed();
+});
+
+it('shows error when no license info available', function () {
+    $client = Mockery::mock(LaravelLicensingClient::class);
+    $this->app->instance(LaravelLicensingClient::class, $client);
+
+    $client->shouldReceive('getLicenseInfo')
+        ->once()
+        ->andReturn([]);
+
+    $this->artisan('license:info', ['key' => 'TEST-KEY'])
+        ->expectsOutput('Fetching license information...')
+        ->expectsOutput('No license information available. Please activate the license first.')
+        ->assertFailed();
+});
+
+it('shows online refresh warning in license info', function () {
+    $client = Mockery::mock(LaravelLicensingClient::class);
+    $this->app->instance(LaravelLicensingClient::class, $client);
+
+    $client->shouldReceive('getLicenseInfo')
+        ->once()
+        ->andReturn([
+            'status' => 'active',
+            'issued_at' => '2024-01-01',
+            'expires_at' => '2025-12-31',
+            'license_expires_at' => null,
+            'max_usages' => null,
+            'force_online_after' => '2024-01-14',
+            'grace_until' => null,
+        ]);
+
+    $client->shouldReceive('isExpiringSoon')
+        ->once()
+        ->andReturn(false);
+
+    $client->shouldReceive('requiresOnlineRefresh')
+        ->once()
+        ->andReturn(true);
+
+    $this->artisan('license:info', ['key' => 'TEST-KEY'])
+        ->expectsOutput('Warning: Online refresh is required!')
         ->assertSuccessful();
 });
 

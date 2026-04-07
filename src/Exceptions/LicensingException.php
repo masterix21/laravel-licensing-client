@@ -41,6 +41,41 @@ class LicensingException extends Exception
         return new self('License usage limit has been exceeded.');
     }
 
+    public static function licenseSuspended(): self
+    {
+        return new self('The license has been suspended.');
+    }
+
+    public static function licenseCancelled(): self
+    {
+        return new self('The license has been cancelled.');
+    }
+
+    public static function fingerprintConflict(): self
+    {
+        return new self('The fingerprint is already in use by another device.');
+    }
+
+    public static function offlineTokenDisabled(): self
+    {
+        return new self('Offline tokens are not enabled for this license.');
+    }
+
+    public static function rateLimited(): self
+    {
+        return new self('Too many requests to the licensing server. Please try again later.');
+    }
+
+    public static function forceOnlineRequired(): self
+    {
+        return new self('Online verification is required. Please connect to the internet.');
+    }
+
+    public static function invalidLicenseStatus(string $status): self
+    {
+        return new self("License status '{$status}' is not valid for use.");
+    }
+
     public static function invalidConfiguration(string $message): self
     {
         return new self("Invalid configuration: {$message}");

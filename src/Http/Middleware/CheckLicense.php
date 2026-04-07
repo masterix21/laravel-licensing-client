@@ -18,7 +18,6 @@ class CheckLicense
      */
     public function handle(Request $request, Closure $next): mixed
     {
-        // Check if route is excluded
         if ($this->isExcludedRoute($request)) {
             return $next($request);
         }
@@ -26,8 +25,14 @@ class CheckLicense
         $licenseKey = config('licensing-client.license_key');
 
         try {
-            // If license is valid, continue with normal flow
             if ($this->client->isValid($licenseKey)) {
+                // Token is valid offline, but check if online refresh is required
+                if ($this->client->requiresOnlineRefresh($licenseKey)) {
+                    if (! $this->client->refresh($licenseKey)) {
+                        return $this->handleInvalidLicense($request);
+                    }
+                }
+
                 return $this->continueWithValidLicense($request, $next, $licenseKey);
             }
 
@@ -36,7 +41,7 @@ class CheckLicense
                 return $this->continueWithValidLicense($request, $next, $licenseKey);
             }
 
-            // Check if we're in grace period
+            // Check if we're in grace period (client-side, server unreachable)
             if ($this->client->isInGracePeriod()) {
                 return $this->continueWithValidLicense($request, $next, $licenseKey);
             }
@@ -59,10 +64,8 @@ class CheckLicense
      */
     protected function continueWithValidLicense(Request $request, Closure $next, string $licenseKey): mixed
     {
-        // Send heartbeat if needed
         $this->client->heartbeat($licenseKey);
 
-        // Check if license is expiring soon
         if ($this->client->isExpiringSoon(7, $licenseKey)) {
             $this->addExpirationWarning($request);
         }
@@ -123,7 +126,7 @@ class CheckLicense
     {
         $licenseKey = config('licensing-client.license_key');
         $licenseInfo = $this->client->getLicenseInfo($licenseKey);
-        $expiresAt = $licenseInfo['expires_at'] ?? null;
+        $expiresAt = $licenseInfo['expires_at'] ?? $licenseInfo['license_expires_at'] ?? null;
 
         if ($expiresAt) {
             $request->attributes->set('license_expiring_soon', true);

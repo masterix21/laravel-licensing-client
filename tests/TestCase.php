@@ -90,14 +90,17 @@ class TestCase extends Orchestra
         $builder = \ParagonIE\Paseto\Builder::getPublic($this->privateKey, new \ParagonIE\Paseto\Protocol\Version4);
 
         $defaultClaims = [
-            'license_key' => 'TEST-LICENSE-KEY',
-            'fingerprint' => app(\LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator::class)->generate(),
-            'customer_email' => 'test@example.com',
-            'customer_name' => 'Test User',
+            'sub' => '1',
+            'iss' => 'laravel-licensing',
+            'license_id' => 1,
+            'license_key_hash' => hash('sha256', 'TEST-LICENSE-KEY'),
+            'usage_fingerprint' => app(\LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator::class)->generate(),
+            'status' => 'active',
+            'max_usages' => 5,
             'exp' => now()->addYear()->toIso8601String(),
+            'nbf' => now()->toIso8601String(),
             'iat' => now()->toIso8601String(),
-            'max_usages' => 1,
-            'current_usages' => 0,
+            'force_online_after' => now()->addDays(14)->toIso8601String(),
         ];
 
         $finalClaims = array_merge($defaultClaims, $claims);

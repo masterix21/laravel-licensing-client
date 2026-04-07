@@ -35,13 +35,28 @@ it('activates a license successfully', function () {
     $this->apiClient->shouldReceive('activate')
         ->with('TEST-KEY', 'test-fingerprint', ['meta' => 'data'])
         ->once()
-        ->andReturn(['token' => 'activated-token']);
+        ->andReturn([
+            'success' => true,
+            'data' => [
+                'token' => 'activated-token',
+                'refresh_after' => '2027-01-07T00:00:00+00:00',
+                'public_key_bundle' => ['signing' => ['kid' => 'k1']],
+            ],
+        ]);
 
     $this->tokenStorage->shouldReceive('store')
         ->with('activated-token', 'TEST-KEY')
         ->once();
 
     $this->tokenStorage->shouldReceive('storeLastHeartbeat')
+        ->once();
+
+    $this->tokenStorage->shouldReceive('storePublicKeyBundle')
+        ->with(['signing' => ['kid' => 'k1']])
+        ->once();
+
+    $this->tokenStorage->shouldReceive('storeRefreshAfter')
+        ->with('2027-01-07T00:00:00+00:00')
         ->once();
 
     $result = $this->client->activate();
@@ -59,7 +74,7 @@ it('deactivates a license successfully', function () {
     config(['licensing-client.license_key' => 'TEST-KEY']);
 
     $this->apiClient->shouldReceive('deactivate')
-        ->with('TEST-KEY', 'test-fingerprint')
+        ->with('TEST-KEY', 'test-fingerprint', null)
         ->once();
 
     $this->tokenStorage->shouldReceive('delete')
@@ -113,11 +128,11 @@ it('validates license with exception on failure', function () {
     $this->tokenValidator->shouldReceive('validate')
         ->with('valid-token')
         ->once()
-        ->andReturn(['license' => 'data']);
+        ->andReturn(['license_id' => 1, 'status' => 'active']);
 
     $result = $this->client->validate();
 
-    expect($result)->toBe(['license' => 'data']);
+    expect($result)->toBe(['license_id' => 1, 'status' => 'active']);
 });
 
 it('throws exception when validating without stored token', function () {
@@ -137,7 +152,10 @@ it('refreshes a license token', function () {
     $this->apiClient->shouldReceive('refresh')
         ->with('TEST-KEY', 'test-fingerprint')
         ->once()
-        ->andReturn(['token' => 'refreshed-token']);
+        ->andReturn([
+            'success' => true,
+            'data' => ['token' => 'refreshed-token'],
+        ]);
 
     $this->tokenStorage->shouldReceive('store')
         ->with('refreshed-token', 'TEST-KEY')
@@ -157,17 +175,13 @@ it('sends heartbeat when enabled', function () {
 
     $this->tokenStorage->shouldReceive('getLastHeartbeat')
         ->once()
-        ->andReturn(null); // Force heartbeat to be needed
+        ->andReturn(null);
 
     $this->apiClient->shouldReceive('heartbeat')
         ->once()
-        ->andReturn(['success' => true, 'token' => 'new-token']);
+        ->andReturn(['success' => true]);
 
     $this->tokenStorage->shouldReceive('storeLastHeartbeat')
-        ->once();
-
-    $this->tokenStorage->shouldReceive('store')
-        ->with('new-token', 'TEST-KEY')
         ->once();
 
     $result = $this->client->heartbeat();
@@ -194,7 +208,8 @@ it('gets license information', function () {
         ->andReturn('valid-token');
 
     $licenseInfo = [
-        'customer_email' => 'test@example.com',
+        'license_id' => 1,
+        'status' => 'active',
         'expires_at' => now()->addYear()->toIso8601String(),
     ];
 
@@ -222,6 +237,24 @@ it('checks if license is expiring soon', function () {
         ->andReturn(true);
 
     $result = $this->client->isExpiringSoon(7);
+
+    expect($result)->toBeTrue();
+});
+
+it('checks if online refresh is required', function () {
+    config(['licensing-client.license_key' => 'TEST-KEY']);
+
+    $this->tokenStorage->shouldReceive('retrieve')
+        ->with('TEST-KEY')
+        ->once()
+        ->andReturn('valid-token');
+
+    $this->tokenValidator->shouldReceive('requiresOnlineRefresh')
+        ->with('valid-token')
+        ->once()
+        ->andReturn(true);
+
+    $result = $this->client->requiresOnlineRefresh();
 
     expect($result)->toBeTrue();
 });
@@ -265,4 +298,95 @@ it('checks server health', function () {
     $result = $this->client->isServerHealthy();
 
     expect($result)->toBeTrue();
+});
+
+it('checks if should refresh proactively when refresh_after is past', function () {
+    $this->tokenStorage->shouldReceive('getRefreshAfter')
+        ->once()
+        ->andReturn(now()->subHour()->toIso8601String());
+
+    expect($this->client->shouldRefreshProactively())->toBeTrue();
+});
+
+it('checks if should not refresh proactively when refresh_after is future', function () {
+    $this->tokenStorage->shouldReceive('getRefreshAfter')
+        ->once()
+        ->andReturn(now()->addDay()->toIso8601String());
+
+    expect($this->client->shouldRefreshProactively())->toBeFalse();
+});
+
+it('returns false for requiresOnlineRefresh when no token', function () {
+    config(['licensing-client.license_key' => 'TEST-KEY']);
+
+    $this->tokenStorage->shouldReceive('retrieve')
+        ->with('TEST-KEY')
+        ->once()
+        ->andReturn(null);
+
+    expect($this->client->requiresOnlineRefresh())->toBeFalse();
+});
+
+it('returns false for requiresOnlineRefresh when no license key', function () {
+    config(['licensing-client.license_key' => null]);
+
+    expect($this->client->requiresOnlineRefresh())->toBeFalse();
+});
+
+it('returns false for shouldRefreshProactively when no refresh_after', function () {
+    $this->tokenStorage->shouldReceive('getRefreshAfter')
+        ->once()
+        ->andReturn(null);
+
+    expect($this->client->shouldRefreshProactively())->toBeFalse();
+});
+
+it('returns false for isExpiringSoon when no license key', function () {
+    config(['licensing-client.license_key' => null]);
+
+    expect($this->client->isExpiringSoon())->toBeFalse();
+});
+
+it('returns false for isExpiringSoon when no token', function () {
+    config(['licensing-client.license_key' => 'TEST-KEY']);
+
+    $this->tokenStorage->shouldReceive('retrieve')
+        ->with('TEST-KEY')
+        ->once()
+        ->andReturn(null);
+
+    expect($this->client->isExpiringSoon())->toBeFalse();
+});
+
+it('returns empty array for getLicenseInfo when no license key', function () {
+    config(['licensing-client.license_key' => null]);
+
+    expect($this->client->getLicenseInfo())->toBe([]);
+});
+
+it('returns false for deactivate when no license key', function () {
+    config(['licensing-client.license_key' => null]);
+
+    expect($this->client->deactivate())->toBeFalse();
+});
+
+it('returns false for refresh when no license key', function () {
+    config(['licensing-client.license_key' => null]);
+
+    expect($this->client->refresh())->toBeFalse();
+});
+
+it('returns false for heartbeat when no license key', function () {
+    config(['licensing-client.heartbeat.enabled' => true]);
+    config(['licensing-client.license_key' => null]);
+
+    expect($this->client->heartbeat())->toBeFalse();
+});
+
+it('returns false for isInGracePeriod when no grace data', function () {
+    $this->tokenStorage->shouldReceive('getGracePeriodData')
+        ->once()
+        ->andReturn(null);
+
+    expect($this->client->isInGracePeriod())->toBeFalse();
 });

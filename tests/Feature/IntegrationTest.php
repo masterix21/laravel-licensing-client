@@ -6,37 +6,48 @@ use LucaLongo\LaravelLicensingClient\Facades\LaravelLicensingClient;
 use LucaLongo\LaravelLicensingClient\Services\TokenStorage;
 
 it('can complete a full license lifecycle', function () {
-    // Mock HTTP responses
     Http::fake([
         '*/api/licensing/v1/activate' => Http::response([
-            'token' => $this->generateTestToken([
-                'license_key' => 'INTEGRATION-TEST-KEY',
-                'customer_email' => 'integration@test.com',
-                'customer_name' => 'Integration Test',
-                'max_usages' => 5,
-                'current_usages' => 1,
-            ]),
             'success' => true,
+            'data' => [
+                'token' => $this->generateTestToken([
+                    'license_id' => 1,
+                    'status' => 'active',
+                    'max_usages' => 5,
+                ]),
+                'token_expires_at' => now()->addDays(7)->toIso8601String(),
+                'refresh_after' => now()->addDays(6)->toIso8601String(),
+                'force_online_after' => now()->addDays(14)->toIso8601String(),
+                'license' => ['id' => 'ulid-1', 'status' => 'active', 'max_usages' => 5],
+                'usage' => ['id' => 1, 'fingerprint' => 'fp', 'status' => 'active'],
+            ],
         ], 200),
 
         '*/api/licensing/v1/refresh' => Http::response([
-            'token' => $this->generateTestToken([
-                'license_key' => 'INTEGRATION-TEST-KEY',
-                'exp' => now()->addYear()->toIso8601String(),
-            ]),
             'success' => true,
+            'data' => [
+                'token' => $this->generateTestToken([
+                    'exp' => now()->addYear()->toIso8601String(),
+                ]),
+                'token_expires_at' => now()->addDays(7)->toIso8601String(),
+            ],
         ], 200),
 
         '*/api/licensing/v1/heartbeat' => Http::response([
             'success' => true,
+            'data' => [
+                'usage' => ['id' => 1, 'last_seen_at' => now()->toIso8601String()],
+            ],
         ], 200),
 
         '*/api/licensing/v1/deactivate' => Http::response([
             'success' => true,
+            'data' => ['message' => 'Usage revoked successfully'],
         ], 200),
 
         '*/api/licensing/v1/health' => Http::response([
-            'status' => 'healthy',
+            'success' => true,
+            'data' => ['status' => 'healthy', 'checks' => ['database' => ['status' => 'ok']]],
         ], 200),
     ]);
 
@@ -50,8 +61,8 @@ it('can complete a full license lifecycle', function () {
 
     // Test getting license info
     $info = LaravelLicensingClient::getLicenseInfo('INTEGRATION-TEST-KEY');
-    expect($info)->toHaveKey('customer_email');
-    expect($info['customer_email'])->toBe('integration@test.com');
+    expect($info)->toHaveKey('status');
+    expect($info['status'])->toBe('active');
 
     // Test refresh
     $refreshed = LaravelLicensingClient::refresh('INTEGRATION-TEST-KEY');
@@ -107,8 +118,10 @@ it('handles expired license correctly', function () {
 
     Http::fake([
         '*/api/licensing/v1/activate' => Http::response([
-            'token' => $expiredToken,
             'success' => true,
+            'data' => [
+                'token' => $expiredToken,
+            ],
         ], 200),
     ]);
 
@@ -127,8 +140,10 @@ it('detects when license is expiring soon', function () {
 
     Http::fake([
         '*/api/licensing/v1/activate' => Http::response([
-            'token' => $expiringToken,
             'success' => true,
+            'data' => [
+                'token' => $expiringToken,
+            ],
         ], 200),
     ]);
 
@@ -141,44 +156,40 @@ it('detects when license is expiring soon', function () {
     expect($isExpiringSoon)->toBeFalse();
 });
 
-it('handles usage limits correctly', function () {
-    $limitedToken = $this->generateTestToken([
-        'max_usages' => 2,
-        'current_usages' => 2,
-    ]);
-
+it('detects when online refresh is required', function () {
     $tokenStorage = app(TokenStorage::class);
-    $tokenStorage->store($limitedToken, 'LIMITED-KEY');
+    $token = $this->generateTestToken([
+        'force_online_after' => now()->subDay()->toIso8601String(),
+    ]);
+    $tokenStorage->store($token, 'FORCE-ONLINE-KEY');
 
-    $isValid = LaravelLicensingClient::isValid('LIMITED-KEY');
-    expect($isValid)->toBeFalse();
+    $requiresRefresh = LaravelLicensingClient::requiresOnlineRefresh('FORCE-ONLINE-KEY');
+    expect($requiresRefresh)->toBeTrue();
 });
 
 it('clears all stored data', function () {
     $tokenStorage = app(TokenStorage::class);
     $tokenStorage->store($this->generateTestToken(), 'CLEAR-TEST-KEY');
 
-    // Verify token exists
     expect($tokenStorage->exists('CLEAR-TEST-KEY'))->toBeTrue();
 
-    // Clear all data
     LaravelLicensingClient::clearAll();
 
-    // Verify token is gone
     expect($tokenStorage->exists('CLEAR-TEST-KEY'))->toBeFalse();
 });
 
 it('can use middleware to protect routes', function () {
     Http::fake([
         '*/api/licensing/v1/activate' => Http::response([
-            'token' => $this->generateTestToken(),
             'success' => true,
+            'data' => [
+                'token' => $this->generateTestToken(),
+            ],
         ], 200),
     ]);
 
     LaravelLicensingClient::activate('MIDDLEWARE-TEST-KEY');
 
-    // Create a test route with middleware
     Route::middleware('license')->get('/protected', fn () => 'Protected content');
 
     $response = $this->get('/protected');
@@ -187,13 +198,17 @@ it('can use middleware to protect routes', function () {
 });
 
 it('blocks access when license is invalid via middleware', function () {
-    // Don't activate any license
     config(['licensing-client.license_key' => 'INVALID-KEY']);
 
-    // Mock server as healthy so we don't trigger grace period
     Http::fake([
-        '*/api/licensing/v1/health' => Http::response(['status' => 'healthy'], 200),
-        '*/api/licensing/v1/refresh' => Http::response(['error' => 'Invalid license'], 404),
+        '*/api/licensing/v1/health' => Http::response([
+            'success' => true,
+            'data' => ['status' => 'healthy'],
+        ], 200),
+        '*/api/licensing/v1/refresh' => Http::response([
+            'success' => false,
+            'error' => ['code' => 'INVALID_KEY', 'message' => 'Invalid license'],
+        ], 404),
     ]);
 
     Route::middleware('license')->get('/protected', fn () => 'Protected content');

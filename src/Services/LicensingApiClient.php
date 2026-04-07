@@ -41,35 +41,34 @@ class LicensingApiClient
         } catch (RequestException $e) {
             $this->logError('License activation failed', $e);
 
-            if ($e->response->status() === 404) {
-                throw LicensingException::invalidLicenseKey();
-            }
-
-            if ($e->response->status() === 409) {
-                throw LicensingException::usageLimitExceeded();
-            }
-
-            throw LicensingException::activationFailed($e->getMessage());
+            throw $this->mapRequestException($e, 'activation');
         }
     }
 
     /**
      * Deactivate a license
      */
-    public function deactivate(string $licenseKey, string $fingerprint): array
+    public function deactivate(string $licenseKey, string $fingerprint, ?string $reason = null): array
     {
         try {
+            $payload = [
+                'license_key' => $licenseKey,
+                'fingerprint' => $fingerprint,
+            ];
+
+            if ($reason !== null) {
+                $payload['reason'] = $reason;
+            }
+
             $response = $this->makeRequest()
-                ->post($this->getEndpoint('deactivate'), [
-                    'license_key' => $licenseKey,
-                    'fingerprint' => $fingerprint,
-                ]);
+                ->post($this->getEndpoint('deactivate'), $payload);
 
             $response->throw();
 
             return $response->json();
         } catch (RequestException $e) {
             $this->logError('License deactivation failed', $e);
+
             throw LicensingException::deactivationFailed($e->getMessage());
         }
     }
@@ -92,15 +91,7 @@ class LicensingApiClient
         } catch (RequestException $e) {
             $this->logError('Token refresh failed', $e);
 
-            if ($e->response->status() === 404) {
-                throw LicensingException::invalidLicenseKey();
-            }
-
-            if ($e->response->status() === 403) {
-                throw LicensingException::fingerprintMismatch();
-            }
-
-            throw LicensingException::serverUnreachable();
+            throw $this->mapRequestException($e, 'refresh');
         }
     }
 
@@ -123,7 +114,6 @@ class LicensingApiClient
         } catch (RequestException $e) {
             $this->logError('Heartbeat failed', $e);
 
-            // Don't throw exception for heartbeat failures
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
@@ -146,30 +136,21 @@ class LicensingApiClient
         } catch (RequestException $e) {
             $this->logError('License validation failed', $e);
 
-            if ($e->response->status() === 404) {
-                throw LicensingException::invalidLicenseKey();
-            }
-
-            if ($e->response->status() === 403) {
-                throw LicensingException::fingerprintMismatch();
-            }
-
-            if ($e->response->status() === 410) {
-                throw LicensingException::licenseExpired();
-            }
-
-            throw LicensingException::serverUnreachable();
+            throw $this->mapRequestException($e, 'validation');
         }
     }
 
     /**
      * Get license information
      */
-    public function getLicenseInfo(string $licenseKey): array
+    public function getLicenseInfo(string $licenseKey, string $fingerprint): array
     {
         try {
             $response = $this->makeRequest()
-                ->get($this->getEndpoint("licenses/{$licenseKey}"));
+                ->post($this->getEndpoint('licenses/show'), [
+                    'license_key' => $licenseKey,
+                    'fingerprint' => $fingerprint,
+                ]);
 
             $response->throw();
 
@@ -177,11 +158,7 @@ class LicensingApiClient
         } catch (RequestException $e) {
             $this->logError('Failed to get license info', $e);
 
-            if ($e->response->status() === 404) {
-                throw LicensingException::invalidLicenseKey();
-            }
-
-            throw LicensingException::serverUnreachable();
+            throw $this->mapRequestException($e, 'info');
         }
     }
 
@@ -196,7 +173,7 @@ class LicensingApiClient
 
             $data = $response->json();
 
-            return $data['status'] === 'healthy';
+            return ($data['data']['status'] ?? null) === 'healthy';
         } catch (\Exception $e) {
             $this->logError('Health check failed', $e);
 
@@ -223,6 +200,67 @@ class LicensingApiClient
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/json',
             ]);
+    }
+
+    /**
+     * Map a request exception to the appropriate LicensingException
+     */
+    protected function mapRequestException(RequestException $e, string $context): LicensingException
+    {
+        $status = $e->response->status();
+        $errorCode = $e->response->json('error.code');
+
+        if ($status === 429) {
+            return LicensingException::rateLimited();
+        }
+
+        if ($status === 404) {
+            return LicensingException::invalidLicenseKey();
+        }
+
+        if ($status === 410) {
+            return LicensingException::licenseExpired();
+        }
+
+        if ($status === 423) {
+            if ($errorCode === 'CANCELLED_LICENSE') {
+                return LicensingException::licenseCancelled();
+            }
+
+            return LicensingException::licenseSuspended();
+        }
+
+        if ($status === 403) {
+            if ($errorCode === 'FINGERPRINT_MISMATCH') {
+                return LicensingException::fingerprintMismatch();
+            }
+
+            return LicensingException::invalidLicenseStatus('not_active');
+        }
+
+        if ($status === 409) {
+            if ($errorCode === 'FINGERPRINT_CONFLICT') {
+                return LicensingException::fingerprintConflict();
+            }
+
+            if ($errorCode === 'OFFLINE_TOKEN_DISABLED') {
+                return LicensingException::offlineTokenDisabled();
+            }
+
+            return LicensingException::usageLimitExceeded();
+        }
+
+        if ($status === 422) {
+            $message = $e->response->json('error.message') ?? 'Validation failed';
+
+            return LicensingException::invalidConfiguration($message);
+        }
+
+        return match ($context) {
+            'activation' => LicensingException::activationFailed($e->getMessage()),
+            'refresh' => LicensingException::serverUnreachable(),
+            default => LicensingException::serverUnreachable(),
+        };
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace LucaLongo\LaravelLicensingClient;
 
+use Carbon\Carbon;
 use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
 use LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator;
 use LucaLongo\LaravelLicensingClient\Services\LicensingApiClient;
@@ -33,13 +34,15 @@ class LaravelLicensingClient
             $metadata = $this->fingerprintGenerator->getMetadata();
 
             $response = $this->apiClient->activate($licenseKey, $fingerprint, $metadata);
+            $data = $response['data'] ?? [];
 
-            if (! isset($response['token'])) {
+            if (! isset($data['token'])) {
                 throw LicensingException::activationFailed('No token received from server');
             }
 
-            $this->tokenStorage->store($response['token'], $licenseKey);
+            $this->tokenStorage->store($data['token'], $licenseKey);
             $this->tokenStorage->storeLastHeartbeat();
+            $this->storeServerMetadata($data);
 
             return true;
         } catch (LicensingException $e) {
@@ -52,7 +55,7 @@ class LaravelLicensingClient
     /**
      * Deactivate the current license
      */
-    public function deactivate(?string $licenseKey = null): bool
+    public function deactivate(?string $licenseKey = null, ?string $reason = null): bool
     {
         $licenseKey = $licenseKey ?? config('licensing-client.license_key');
 
@@ -62,7 +65,7 @@ class LaravelLicensingClient
 
         try {
             $fingerprint = $this->fingerprintGenerator->generate();
-            $this->apiClient->deactivate($licenseKey, $fingerprint);
+            $this->apiClient->deactivate($licenseKey, $fingerprint, $reason);
             $this->tokenStorage->delete($licenseKey);
 
             return true;
@@ -72,7 +75,7 @@ class LaravelLicensingClient
     }
 
     /**
-     * Check if the license is valid
+     * Check if the license is valid (offline only)
      */
     public function isValid(?string $licenseKey = null): bool
     {
@@ -82,7 +85,6 @@ class LaravelLicensingClient
             return false;
         }
 
-        // Try offline validation first
         $token = $this->tokenStorage->retrieve($licenseKey);
 
         if (! $token) {
@@ -126,13 +128,15 @@ class LaravelLicensingClient
         try {
             $fingerprint = $this->fingerprintGenerator->generate();
             $response = $this->apiClient->refresh($licenseKey, $fingerprint);
+            $data = $response['data'] ?? [];
 
-            if (! isset($response['token'])) {
+            if (! isset($data['token'])) {
                 return false;
             }
 
-            $this->tokenStorage->store($response['token'], $licenseKey);
+            $this->tokenStorage->store($data['token'], $licenseKey);
             $this->tokenStorage->storeLastHeartbeat();
+            $this->storeServerMetadata($data);
 
             return true;
         } catch (\Exception $e) {
@@ -155,7 +159,6 @@ class LaravelLicensingClient
             return false;
         }
 
-        // Check if heartbeat is needed
         if (! $this->shouldSendHeartbeat()) {
             return true;
         }
@@ -169,11 +172,6 @@ class LaravelLicensingClient
 
             if ($response['success'] ?? false) {
                 $this->tokenStorage->storeLastHeartbeat();
-
-                // Refresh token if provided
-                if (isset($response['token'])) {
-                    $this->tokenStorage->store($response['token'], $licenseKey);
-                }
             }
 
             return $response['success'] ?? false;
@@ -183,7 +181,7 @@ class LaravelLicensingClient
     }
 
     /**
-     * Get license information
+     * Get license information from stored token
      */
     public function getLicenseInfo(?string $licenseKey = null): array
     {
@@ -223,6 +221,40 @@ class LaravelLicensingClient
     }
 
     /**
+     * Check if the token requires an online refresh (force_online_after exceeded)
+     */
+    public function requiresOnlineRefresh(?string $licenseKey = null): bool
+    {
+        $licenseKey = $licenseKey ?? config('licensing-client.license_key');
+
+        if (! $licenseKey) {
+            return false;
+        }
+
+        $token = $this->tokenStorage->retrieve($licenseKey);
+
+        if (! $token) {
+            return false;
+        }
+
+        return $this->tokenValidator->requiresOnlineRefresh($token);
+    }
+
+    /**
+     * Check if a proactive refresh should be done based on refresh_after
+     */
+    public function shouldRefreshProactively(): bool
+    {
+        $refreshAfter = $this->tokenStorage->getRefreshAfter();
+
+        if (! $refreshAfter) {
+            return false;
+        }
+
+        return Carbon::parse($refreshAfter)->isPast();
+    }
+
+    /**
      * Clear all stored license data
      */
     public function clearAll(): void
@@ -231,7 +263,7 @@ class LaravelLicensingClient
     }
 
     /**
-     * Check if we're in grace period
+     * Check if we're in grace period (client-side, server unreachable)
      */
     public function isInGracePeriod(): bool
     {
@@ -242,7 +274,7 @@ class LaravelLicensingClient
         }
 
         $gracePeriodDays = config('licensing-client.grace_period_days', 7);
-        $gracePeriodEnd = \Carbon\Carbon::parse($gracePeriodData['started_at'])
+        $gracePeriodEnd = Carbon::parse($gracePeriodData['started_at'])
             ->addDays($gracePeriodDays);
 
         return $gracePeriodEnd->isFuture();
@@ -265,6 +297,20 @@ class LaravelLicensingClient
     public function isServerHealthy(): bool
     {
         return $this->apiClient->health();
+    }
+
+    /**
+     * Store metadata from server response (public_key_bundle, refresh_after)
+     */
+    protected function storeServerMetadata(array $data): void
+    {
+        if (isset($data['public_key_bundle'])) {
+            $this->tokenStorage->storePublicKeyBundle($data['public_key_bundle']);
+        }
+
+        if (isset($data['refresh_after'])) {
+            $this->tokenStorage->storeRefreshAfter($data['refresh_after']);
+        }
     }
 
     /**

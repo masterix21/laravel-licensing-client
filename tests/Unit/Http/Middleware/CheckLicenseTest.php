@@ -20,6 +20,11 @@ it('allows request when license is valid', function () {
         ->once()
         ->andReturn(true);
 
+    $this->client->shouldReceive('requiresOnlineRefresh')
+        ->with('TEST-KEY')
+        ->once()
+        ->andReturn(false);
+
     $this->client->shouldReceive('heartbeat')
         ->with('TEST-KEY')
         ->once();
@@ -33,6 +38,55 @@ it('allows request when license is valid', function () {
 
     expect($response->getContent())->toBe('OK');
 });
+
+it('forces online refresh when force_online_after is past', function () {
+    $this->client->shouldReceive('isValid')
+        ->with('TEST-KEY')
+        ->once()
+        ->andReturn(true);
+
+    $this->client->shouldReceive('requiresOnlineRefresh')
+        ->with('TEST-KEY')
+        ->once()
+        ->andReturn(true);
+
+    $this->client->shouldReceive('refresh')
+        ->with('TEST-KEY')
+        ->once()
+        ->andReturn(true);
+
+    $this->client->shouldReceive('heartbeat')
+        ->with('TEST-KEY')
+        ->once();
+
+    $this->client->shouldReceive('isExpiringSoon')
+        ->with(7, 'TEST-KEY')
+        ->once()
+        ->andReturn(false);
+
+    $response = $this->middleware->handle($this->request, $this->next);
+
+    expect($response->getContent())->toBe('OK');
+});
+
+it('blocks when force online refresh fails', function () {
+    $this->client->shouldReceive('isValid')
+        ->with('TEST-KEY')
+        ->once()
+        ->andReturn(true);
+
+    $this->client->shouldReceive('requiresOnlineRefresh')
+        ->with('TEST-KEY')
+        ->once()
+        ->andReturn(true);
+
+    $this->client->shouldReceive('refresh')
+        ->with('TEST-KEY')
+        ->once()
+        ->andReturn(false);
+
+    $this->middleware->handle($this->request, $this->next);
+})->throws(\Symfony\Component\HttpKernel\Exception\HttpException::class);
 
 it('allows excluded routes without checking license', function () {
     config(['licensing-client.excluded_routes' => ['test']]);
@@ -184,6 +238,11 @@ it('adds expiration warning to request attributes', function () {
         ->with('TEST-KEY')
         ->once()
         ->andReturn(true);
+
+    $this->client->shouldReceive('requiresOnlineRefresh')
+        ->with('TEST-KEY')
+        ->once()
+        ->andReturn(false);
 
     $this->client->shouldReceive('heartbeat')
         ->with('TEST-KEY')

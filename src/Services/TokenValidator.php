@@ -4,7 +4,7 @@ namespace LucaLongo\LaravelLicensingClient\Services;
 
 use Carbon\Carbon;
 use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
-use ParagonIE\Paseto\Keys\AsymmetricPublicKey;
+use ParagonIE\Paseto\Keys\Base\AsymmetricPublicKey;
 use ParagonIE\Paseto\Parser;
 use ParagonIE\Paseto\Protocol\Version4;
 use ParagonIE\Paseto\ProtocolCollection;
@@ -22,7 +22,7 @@ class TokenValidator
     }
 
     /**
-     * Validate a PASETO token
+     * Validate a PASETO token and return its claims
      */
     public function validate(string $token): array
     {
@@ -34,17 +34,18 @@ class TokenValidator
             $parsedToken = $this->parser->parse($token);
             $claims = $parsedToken->getClaims();
 
-            // Validate fingerprint
             if (! $this->validateFingerprint($claims)) {
                 throw LicensingException::fingerprintMismatch();
             }
 
-            // Validate expiration
             if (! $this->validateExpiration($claims)) {
                 throw LicensingException::licenseExpired();
             }
 
-            // Validate usage limits
+            if (! $this->validateStatus($claims)) {
+                throw LicensingException::invalidLicenseStatus($claims['status'] ?? 'unknown');
+            }
+
             if (! $this->validateUsageLimits($claims)) {
                 throw LicensingException::usageLimitExceeded();
             }
@@ -55,7 +56,6 @@ class TokenValidator
                 throw $e;
             }
 
-            // Check if the exception is related to expiration
             if (str_contains($e->getMessage(), 'exp') || str_contains($e->getMessage(), 'expired')) {
                 throw LicensingException::licenseExpired();
             }
@@ -75,6 +75,25 @@ class TokenValidator
             return true;
         } catch (\Exception $e) {
             return false;
+        }
+    }
+
+    /**
+     * Check if the token requires an online refresh (force_online_after exceeded)
+     */
+    public function requiresOnlineRefresh(string $token): bool
+    {
+        try {
+            $parsedToken = $this->parser->parse($token);
+            $claims = $parsedToken->getClaims();
+
+            if (! isset($claims['force_online_after'])) {
+                return false;
+            }
+
+            return Carbon::parse($claims['force_online_after'])->isPast();
+        } catch (\Exception $e) {
+            return true;
         }
     }
 
@@ -107,7 +126,6 @@ class TokenValidator
             return false;
         }
 
-        // Check if token is expiring within the threshold but hasn't expired yet
         $now = now();
         $daysUntilExpiration = $now->diffInDays($expiration, false);
 
@@ -115,7 +133,7 @@ class TokenValidator
     }
 
     /**
-     * Extract license information from token
+     * Extract license information from token claims
      */
     public function extractLicenseInfo(string $token): array
     {
@@ -123,15 +141,16 @@ class TokenValidator
             $claims = $this->validate($token);
 
             return [
-                'license_key' => $claims['license_key'] ?? null,
-                'customer_email' => $claims['customer_email'] ?? null,
-                'customer_name' => $claims['customer_name'] ?? null,
+                'license_id' => $claims['license_id'] ?? null,
+                'license_key_hash' => $claims['license_key_hash'] ?? null,
+                'status' => $claims['status'] ?? null,
+                'max_usages' => $claims['max_usages'] ?? null,
                 'expires_at' => $claims['exp'] ?? null,
                 'issued_at' => $claims['iat'] ?? null,
-                'max_usages' => $claims['max_usages'] ?? null,
-                'current_usages' => $claims['current_usages'] ?? null,
-                'features' => $claims['features'] ?? [],
-                'metadata' => $claims['metadata'] ?? [],
+                'license_expires_at' => $claims['license_expires_at'] ?? null,
+                'force_online_after' => $claims['force_online_after'] ?? null,
+                'grace_until' => $claims['grace_until'] ?? null,
+                'usage_fingerprint' => $claims['usage_fingerprint'] ?? null,
             ];
         } catch (\Exception $e) {
             return [];
@@ -159,29 +178,54 @@ class TokenValidator
     }
 
     /**
-     * Validate fingerprint claim
+     * Update the public key used for token validation (for key rotation)
+     */
+    public function updatePublicKey(string $publicKeyString): void
+    {
+        try {
+            $this->publicKey = AsymmetricPublicKey::fromEncodedString($publicKeyString, new Version4);
+            $this->parser = Parser::getPublic($this->publicKey, ProtocolCollection::v4());
+        } catch (\Exception $e) {
+            throw LicensingException::invalidConfiguration('Invalid public key format');
+        }
+    }
+
+    /**
+     * Validate fingerprint claim matches current device
      */
     protected function validateFingerprint(array $claims): bool
     {
-        if (! isset($claims['fingerprint'])) {
+        if (! isset($claims['usage_fingerprint'])) {
             return false;
         }
 
         $currentFingerprint = $this->fingerprintGenerator->generate();
 
-        return hash_equals($claims['fingerprint'], $currentFingerprint);
+        return hash_equals($claims['usage_fingerprint'], $currentFingerprint);
     }
 
     /**
-     * Validate expiration
+     * Validate token expiration
      */
     protected function validateExpiration(array $claims): bool
     {
         if (! isset($claims['exp'])) {
-            return true; // No expiration means perpetual license
+            return true;
         }
 
         return Carbon::parse($claims['exp'])->isFuture();
+    }
+
+    /**
+     * Validate license status is usable (active or grace)
+     */
+    protected function validateStatus(array $claims): bool
+    {
+        if (! isset($claims['status'])) {
+            return true;
+        }
+
+        return in_array($claims['status'], ['active', 'grace'], true);
     }
 
     /**
@@ -189,15 +233,14 @@ class TokenValidator
      */
     protected function validateUsageLimits(array $claims): bool
     {
-        if (! isset($claims['max_usages']) || ! isset($claims['current_usages'])) {
-            return true; // No usage limits
+        if (! isset($claims['max_usages'])) {
+            return true;
         }
 
-        // -1 means unlimited
         if ($claims['max_usages'] === -1) {
             return true;
         }
 
-        return $claims['current_usages'] < $claims['max_usages'];
+        return true;
     }
 }

@@ -16,8 +16,8 @@ it('validates a valid token', function () {
     $claims = $this->validator->validate($token);
 
     expect($claims)->toBeArray();
-    expect($claims)->toHaveKey('license_key');
-    expect($claims['license_key'])->toBe('TEST-LICENSE-KEY');
+    expect($claims)->toHaveKey('license_id');
+    expect($claims['status'])->toBe('active');
 });
 
 it('throws exception for invalid token', function () {
@@ -34,25 +34,34 @@ it('throws exception for expired token', function () {
 
 it('throws exception for fingerprint mismatch', function () {
     $token = $this->generateTestToken([
-        'fingerprint' => 'wrong-fingerprint',
+        'usage_fingerprint' => 'wrong-fingerprint',
     ]);
 
     $this->validator->validate($token);
 })->throws(LicensingException::class, 'Device fingerprint does not match the licensed device.');
 
-it('throws exception when usage limit exceeded', function () {
+it('throws exception for invalid license status', function () {
     $token = $this->generateTestToken([
-        'max_usages' => 1,
-        'current_usages' => 2,
+        'status' => 'suspended',
     ]);
 
     $this->validator->validate($token);
-})->throws(LicensingException::class, 'License usage limit has been exceeded.');
+})->throws(LicensingException::class, "License status 'suspended' is not valid for use.");
+
+it('allows grace status', function () {
+    $token = $this->generateTestToken([
+        'status' => 'grace',
+        'grace_until' => now()->addDays(7)->toIso8601String(),
+    ]);
+
+    $claims = $this->validator->validate($token);
+
+    expect($claims['status'])->toBe('grace');
+});
 
 it('allows unlimited usage when max_usages is -1', function () {
     $token = $this->generateTestToken([
         'max_usages' => -1,
-        'current_usages' => 999,
     ]);
 
     $claims = $this->validator->validate($token);
@@ -80,14 +89,7 @@ it('gets token expiration date', function () {
     expect($expiration->toIso8601String())->toBe($expirationDate->toIso8601String());
 });
 
-it('returns null for token without expiration', function () {
-    $token = $this->generateTestToken();
-    // Remove exp claim
-    $claims = json_decode(base64_decode(explode('.', $token)[1]), true);
-    unset($claims['exp']);
-
-    // For this test, we'll need to mock a token without expiration
-    // Since we can't easily create one without the exp claim
+it('returns null for invalid token expiration', function () {
     expect($this->validator->getExpiration('invalid-token'))->toBeNull();
 });
 
@@ -106,21 +108,20 @@ it('checks if token is expiring soon', function () {
 
 it('extracts license information from token', function () {
     $token = $this->generateTestToken([
-        'license_key' => 'LICENSE-123',
-        'customer_email' => 'customer@example.com',
-        'customer_name' => 'John Doe',
-        'features' => ['feature1', 'feature2'],
-        'metadata' => ['custom' => 'data'],
+        'license_id' => 42,
+        'status' => 'active',
+        'max_usages' => 10,
+        'license_expires_at' => '2027-12-31T23:59:59+00:00',
+        'force_online_after' => now()->addDays(14)->toIso8601String(),
     ]);
 
     $info = $this->validator->extractLicenseInfo($token);
 
     expect($info)->toMatchArray([
-        'license_key' => 'LICENSE-123',
-        'customer_email' => 'customer@example.com',
-        'customer_name' => 'John Doe',
-        'features' => ['feature1', 'feature2'],
-        'metadata' => ['custom' => 'data'],
+        'license_id' => 42,
+        'status' => 'active',
+        'max_usages' => 10,
+        'license_expires_at' => '2027-12-31T23:59:59+00:00',
     ]);
 });
 
@@ -129,6 +130,37 @@ it('returns empty array for invalid token when extracting info', function () {
 
     expect($info)->toBe([]);
 });
+
+it('detects when online refresh is required', function () {
+    $token = $this->generateTestToken([
+        'force_online_after' => now()->subDay()->toIso8601String(),
+    ]);
+
+    expect($this->validator->requiresOnlineRefresh($token))->toBeTrue();
+});
+
+it('detects when online refresh is not required', function () {
+    $token = $this->generateTestToken([
+        'force_online_after' => now()->addDays(14)->toIso8601String(),
+    ]);
+
+    expect($this->validator->requiresOnlineRefresh($token))->toBeFalse();
+});
+
+it('can update public key for key rotation', function () {
+    $newKey = $this->publicKey->encode();
+    $this->validator->updatePublicKey($newKey);
+
+    $token = $this->generateTestToken();
+    $claims = $this->validator->validate($token);
+
+    expect($claims)->toBeArray();
+    expect($claims['status'])->toBe('active');
+});
+
+it('throws exception for invalid public key in updatePublicKey', function () {
+    $this->validator->updatePublicKey('invalid-key');
+})->throws(LicensingException::class, 'Invalid public key format');
 
 it('throws exception when public key is missing', function () {
     config(['licensing-client.public_key' => null]);

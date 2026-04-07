@@ -36,9 +36,9 @@ class ActivateLicenseCommand extends Command
                     $this->table(
                         ['Property', 'Value'],
                         [
-                            ['Customer', $licenseInfo['customer_name'] ?? 'N/A'],
-                            ['Email', $licenseInfo['customer_email'] ?? 'N/A'],
-                            ['Expires', $licenseInfo['expires_at'] ?? 'Never'],
+                            ['Status', $licenseInfo['status'] ?? 'N/A'],
+                            ['License Expires', $licenseInfo['license_expires_at'] ?? 'Never'],
+                            ['Token Expires', $licenseInfo['expires_at'] ?? 'Never'],
                             ['Max Usages', $licenseInfo['max_usages'] ?? 'Unlimited'],
                         ]
                     );

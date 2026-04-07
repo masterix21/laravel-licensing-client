@@ -133,6 +133,56 @@ class TokenStorage
     }
 
     /**
+     * Store the public key bundle received from the server
+     */
+    public function storePublicKeyBundle(array $bundle): void
+    {
+        $filename = $this->storagePath.'/public_key_bundle.json';
+        File::put($filename, encrypt(json_encode($bundle)));
+    }
+
+    /**
+     * Get the stored public key bundle
+     */
+    public function getPublicKeyBundle(): ?array
+    {
+        $filename = $this->storagePath.'/public_key_bundle.json';
+
+        if (! File::exists($filename)) {
+            return null;
+        }
+
+        try {
+            return json_decode(decrypt(File::get($filename)), true);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Store the refresh_after timestamp from the server
+     */
+    public function storeRefreshAfter(string $refreshAfter): void
+    {
+        $filename = $this->storagePath.'/refresh_after';
+        File::put($filename, $refreshAfter);
+    }
+
+    /**
+     * Get the stored refresh_after timestamp
+     */
+    public function getRefreshAfter(): ?string
+    {
+        $filename = $this->storagePath.'/refresh_after';
+
+        if (! File::exists($filename)) {
+            return null;
+        }
+
+        return File::get($filename);
+    }
+
+    /**
      * Store grace period data
      */
     public function storeGracePeriodData(array $data): void
@@ -167,8 +217,9 @@ class TokenStorage
 
         // Clear all cache entries
         if (config('licensing-client.cache.enabled')) {
-            Cache::store(config('licensing-client.cache.store'))
-                ->flush();
+            /** @var \Illuminate\Cache\Repository $store */
+            $store = Cache::store(config('licensing-client.cache.store'));
+            $store->getStore()->flush();
         }
     }
 

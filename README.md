@@ -5,45 +5,25 @@
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/masterix21/laravel-licensing-client/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/masterix21/laravel-licensing-client/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/masterix21/laravel-licensing-client.svg?style=flat-square)](https://packagist.org/packages/masterix21/laravel-licensing-client)
 
-A comprehensive Laravel package for integrating license validation in your applications. This client package works seamlessly with the [Laravel Licensing](https://github.com/masterix21/laravel-licensing) server to provide secure, offline-capable license management using PASETO v4 tokens.
-
-## Sponsorship
-
-⭐ **Support this project!** If you find this package helpful, please consider [sponsoring the development](https://github.com/sponsors/masterix21) to help maintain and improve it.
+A Laravel package for integrating license validation in your applications. Works with the [Laravel Licensing](https://github.com/masterix21/laravel-licensing) server to provide secure, offline-capable license management using PASETO v4 tokens with Ed25519 signatures.
 
 ## Related Packages
 
-This package is part of the Laravel Licensing ecosystem:
-
-- **[Laravel Licensing Server](https://github.com/masterix21/laravel-licensing)** - The server-side package that manages licenses, activations, and validations
-- **[Laravel Licensing Filament Manager](https://github.com/masterix21/laravel-licensing-filament-manager)** - A complete admin panel built with Filament for managing licenses through a user-friendly interface
-
-## Features
-
-- 🔐 **Secure offline validation** using PASETO v4 tokens
-- 🖥️ **Device fingerprinting** to prevent license sharing
-- ⏰ **Grace period support** for handling server downtime
-- 💾 **Token caching** for improved performance
-- 🛡️ **Middleware protection** for routes
-- 🎨 **Artisan commands** for license management
-- 📊 **Usage limit tracking**
-- 🔄 **Automatic token refresh**
-- ❤️ **Heartbeat mechanism** for license status updates
+- **[Laravel Licensing Server](https://github.com/masterix21/laravel-licensing)** - Server-side license management
+- **[Laravel Licensing Filament Manager](https://github.com/masterix21/laravel-licensing-filament-manager)** - Admin panel built with Filament
 
 ## Requirements
 
-- PHP 8.1 or higher
-- Laravel 10.0 or higher
+- PHP 8.3+
+- Laravel 12 or 13
 
 ## Installation
-
-Install the package via Composer:
 
 ```bash
 composer require masterix21/laravel-licensing-client
 ```
 
-Publish the configuration file:
+Publish the configuration:
 
 ```bash
 php artisan vendor:publish --tag="licensing-client-config"
@@ -57,97 +37,97 @@ php artisan migrate
 
 ## Configuration
 
-Configure the package in `config/licensing-client.php`:
+Add these variables to your `.env`:
+
+```env
+LICENSING_SERVER_URL=https://your-licensing-server.com
+LICENSING_PUBLIC_KEY=your-base64-encoded-ed25519-public-key
+LICENSING_KEY=LIC-XXXX-XXXX-XXXX-XXXX
+```
+
+The full configuration is in `config/licensing-client.php`:
 
 ```php
 return [
-    // Licensing server configuration
     'server_url' => env('LICENSING_SERVER_URL', 'https://licensing.example.com'),
     'api_version' => env('LICENSING_API_VERSION', 'v1'),
+    'license_key' => env('LICENSING_KEY'),
+    'public_key' => env('LICENSING_PUBLIC_KEY'),
+    'issuer' => env('LICENSING_ISSUER', 'laravel-licensing'),
 
-    // PASETO v4 public key for offline token validation
-    'public_key' => env('LICENSING_PUBLIC_KEY', ''),
-
-    // Default license key (can be overridden at runtime)
-    'license_key' => env('LICENSE_KEY', ''),
-
-    // Storage configuration
-    'storage_path' => storage_path('licensing'),
-
-    // Cache configuration
     'cache' => [
         'enabled' => env('LICENSING_CACHE_ENABLED', true),
         'store' => env('LICENSING_CACHE_STORE', 'file'),
-        'ttl' => env('LICENSING_CACHE_TTL', 3600), // 1 hour
+        'ttl' => env('LICENSING_CACHE_TTL', 3600),
     ],
 
-    // Heartbeat configuration
     'heartbeat' => [
         'enabled' => env('LICENSING_HEARTBEAT_ENABLED', true),
-        'interval' => env('LICENSING_HEARTBEAT_INTERVAL', 3600), // 1 hour
+        'interval' => env('LICENSING_HEARTBEAT_INTERVAL', 3600),
     ],
 
-    // Grace period for server unavailability (in hours)
-    'grace_period' => env('LICENSING_GRACE_PERIOD', 72), // 3 days
+    'grace_period_days' => env('LICENSING_GRACE_PERIOD_DAYS', 7),
+    'timeout' => env('LICENSING_TIMEOUT', 30),
+    'debug' => env('LICENSING_DEBUG', false),
+    'storage_path' => storage_path('app/licensing'),
 
-    // Routes to exclude from license checking
     'excluded_routes' => [
         'login',
         'register',
         'password/*',
-        'health',
+        'licensing/*',
     ],
 ];
 ```
 
-### Environment Variables
+## Usage
 
-Add these to your `.env` file:
-
-```env
-LICENSING_SERVER_URL=https://your-licensing-server.com
-LICENSING_PUBLIC_KEY=your-paseto-v4-public-key
-LICENSE_KEY=YOUR-LICENSE-KEY-HERE
-```
-
-## Basic Usage
-
-### Using the Facade
+### Facade
 
 ```php
 use LucaLongo\LaravelLicensingClient\Facades\LaravelLicensingClient;
 
-// Activate a license
-$activated = LaravelLicensingClient::activate('LICENSE-KEY-123');
+// Activate
+LaravelLicensingClient::activate('LIC-XXXX-XXXX-XXXX-XXXX');
 
-// Check if license is valid
-if (LaravelLicensingClient::isValid()) {
-    // License is valid, proceed with application logic
-}
+// Check validity (offline, from stored PASETO token)
+LaravelLicensingClient::isValid();
 
-// Get license information
-$licenseInfo = LaravelLicensingClient::getLicenseInfo();
+// Validate with exception on failure
+$claims = LaravelLicensingClient::validate();
+
+// Get license info from token claims
+$info = LaravelLicensingClient::getLicenseInfo();
 // Returns: [
-//     'license_key' => 'LICENSE-KEY-123',
-//     'customer_email' => 'customer@example.com',
-//     'customer_name' => 'John Doe',
-//     'expires_at' => '2025-01-01T00:00:00Z',
+//     'license_id' => 1,
+//     'license_key_hash' => 'sha256...',
+//     'status' => 'active',
 //     'max_usages' => 5,
-//     'current_usages' => 2,
-//     'features' => ['feature1', 'feature2'],
-//     'metadata' => ['custom' => 'data']
+//     'expires_at' => '2027-01-07T00:00:00+00:00',
+//     'issued_at' => '2027-01-01T00:00:00+00:00',
+//     'license_expires_at' => '2027-12-31T23:59:59+00:00',
+//     'force_online_after' => '2027-01-14T00:00:00+00:00',
+//     'grace_until' => null,
+//     'usage_fingerprint' => 'sha256...',
 // ]
 
-// Check if expiring soon (within 7 days)
-if (LaravelLicensingClient::isExpiringSoon(7)) {
-    // Notify user to renew license
-}
+// Check expiration warnings
+LaravelLicensingClient::isExpiringSoon(7);
 
-// Refresh the license token
+// Check if online refresh is required (force_online_after exceeded)
+LaravelLicensingClient::requiresOnlineRefresh();
+
+// Proactive refresh check (based on refresh_after from server)
+LaravelLicensingClient::shouldRefreshProactively();
+
+// Refresh the token
 LaravelLicensingClient::refresh();
 
-// Deactivate a license
-LaravelLicensingClient::deactivate('LICENSE-KEY-123');
+// Deactivate (with optional reason)
+LaravelLicensingClient::deactivate('LIC-XXXX-XXXX-XXXX-XXXX', 'switching device');
+
+// Server health
+LaravelLicensingClient::isServerHealthy();
 ```
 
 ### Dependency Injection
@@ -157,320 +137,151 @@ use LucaLongo\LaravelLicensingClient\LaravelLicensingClient;
 
 class LicenseController extends Controller
 {
-    public function __construct(
-        private LaravelLicensingClient $licensing
-    ) {}
-
-    public function status()
+    public function status(LaravelLicensingClient $licensing)
     {
-        if ($this->licensing->isValid()) {
-            return response()->json([
-                'valid' => true,
-                'info' => $this->licensing->getLicenseInfo()
-            ]);
-        }
-
-        return response()->json(['valid' => false], 403);
+        return response()->json([
+            'valid' => $licensing->isValid(),
+            'info' => $licensing->getLicenseInfo(),
+            'requires_refresh' => $licensing->requiresOnlineRefresh(),
+        ]);
     }
 }
 ```
 
-## Middleware Protection
+## Middleware
 
-Protect your routes using the `license` middleware:
+Protect routes with the `license` middleware:
 
 ```php
-// In routes/web.php or routes/api.php
+// Single route
+Route::get('/dashboard', DashboardController::class)->middleware('license');
 
-// Protect individual routes
-Route::get('/dashboard', DashboardController::class)
-    ->middleware('license');
-
-// Protect route groups
-Route::middleware(['license'])->group(function () {
+// Route group
+Route::middleware('license')->group(function () {
     Route::get('/reports', ReportsController::class);
     Route::get('/analytics', AnalyticsController::class);
 });
-
-// API routes with license protection
-Route::prefix('api')->middleware(['api', 'license'])->group(function () {
-    Route::apiResource('products', ProductController::class);
-});
 ```
 
-### Excluding Routes
+### Middleware Behavior
 
-Configure routes that should be accessible without a license in `config/licensing-client.php`:
+The middleware follows this flow:
 
-```php
-'excluded_routes' => [
-    'login',
-    'register',
-    'password/*',     // Wildcard support
-    'api/health',
-    'public/*',
-],
-```
+1. Check if the route is excluded
+2. Validate the stored token offline
+3. If valid, check `force_online_after` — refresh if past date
+4. If token invalid, attempt refresh from server
+5. If refresh fails, check client-side grace period
+6. If not in grace period, check server health
+7. If server unreachable, start grace period and allow access
+8. If server healthy and no valid license, block with 403
 
-### Handling License Expiration in Middleware
+On valid requests, the middleware also:
+- Sends heartbeat if interval has elapsed
+- Sets `license_expiring_soon` and `license_expires_at` as request attributes if expiration is near
 
-The middleware automatically:
-- Validates the license on each request
-- Attempts to refresh expired tokens
-- Starts grace period if server is unreachable
-- Sends heartbeats to track usage
-- Adds expiration warnings to request attributes
-
-Access expiration warnings in your controllers:
+### Accessing Expiration Warnings
 
 ```php
 public function dashboard(Request $request)
 {
     if ($request->attributes->get('license_expiring_soon')) {
         $expiresAt = $request->attributes->get('license_expires_at');
-        // Show warning banner to user
+        // Show renewal warning
     }
-
-    return view('dashboard');
 }
 ```
 
-## Artisan Commands
+### Excluding Routes
 
-### Activate a License
-
-```bash
-# With license key as argument
-php artisan license:activate YOUR-LICENSE-KEY
-
-# Interactive mode (will prompt for key)
-php artisan license:activate
-```
-
-### Validate License Status
-
-```bash
-# Check current license
-php artisan license:validate
-
-# Check specific license
-php artisan license:validate --key=ANOTHER-LICENSE-KEY
-```
-
-### Display License Information
-
-```bash
-php artisan license:info
-```
-
-Output:
-```
-License Information:
-====================
-Status: ✓ Active
-License Key: YOUR-LICENSE-KEY
-Customer: John Doe (john@example.com)
-Expires: 2025-01-01 00:00:00 (in 180 days)
-Usage: 2 / 5 activations
-Features: feature1, feature2, premium_support
-```
-
-### Refresh License Token
-
-```bash
-php artisan license:refresh
-```
-
-### Deactivate License
-
-```bash
-php artisan license:deactivate
-
-# With confirmation bypass
-php artisan license:deactivate --force
-```
-
-## Task Scheduling
-
-### Automatic License Maintenance
-
-The package includes automatic license maintenance through Laravel's task scheduler. When heartbeat is enabled, it automatically sends heartbeat signals to keep your license status synchronized with the server.
-
-To enable automatic scheduling, add the following to your `app/Console/Kernel.php`:
+Configure in `config/licensing-client.php`:
 
 ```php
-protected function schedule(Schedule $schedule): void
-{
-    // The package automatically schedules heartbeat when enabled in config
-    // No manual configuration needed if heartbeat.enabled is true
-}
-```
-
-The heartbeat runs based on your configuration:
-- **Default interval**: Every 60 minutes (3600 seconds)
-- **Configurable via**: `LICENSING_HEARTBEAT_INTERVAL` environment variable (in seconds)
-
-### Manual License Checks
-
-If you prefer manual control or need additional license checks, you can schedule commands:
-
-```php
-use Illuminate\Console\Scheduling\Schedule;
-
-protected function schedule(Schedule $schedule): void
-{
-    // Validate license daily
-    $schedule->command('license:validate')
-        ->daily()
-        ->onFailure(function () {
-            // Handle invalid license
-            Log::error('License validation failed');
-        });
-
-    // Refresh license token weekly
-    $schedule->command('license:refresh')
-        ->weekly()
-        ->onSuccess(function () {
-            Log::info('License token refreshed successfully');
-        });
-
-    // Check and notify about expiring licenses
-    $schedule->call(function () {
-        if (LaravelLicensingClient::isExpiringSoon(7)) {
-            // Send notification about expiring license
-            Mail::to(config('mail.admin'))->send(new LicenseExpiringSoon());
-        }
-    })->daily();
-}
-```
-
-### Configuration
-
-The scheduling behavior is controlled by these settings in `config/licensing-client.php`:
-
-```php
-'heartbeat' => [
-    'enabled' => env('LICENSING_HEARTBEAT_ENABLED', true),
-    'interval' => env('LICENSING_HEARTBEAT_INTERVAL', 3600), // seconds
+'excluded_routes' => [
+    'login',
+    'register',
+    'password/*',
+    'api/health',
 ],
 ```
 
-To disable automatic heartbeat:
+## Grace Period
 
-```env
-LICENSING_HEARTBEAT_ENABLED=false
-```
-
-To change heartbeat frequency (e.g., every 30 minutes):
-
-```env
-LICENSING_HEARTBEAT_INTERVAL=1800
-```
-
-## Grace Period Management
-
-When the licensing server is unreachable, the package automatically enters a grace period:
+The client manages a local grace period when the licensing server is unreachable:
 
 ```php
 // Check if in grace period
-if (LaravelLicensingClient::isInGracePeriod()) {
-    // Show warning that license server is unreachable
-    // Application continues to work for configured grace period
-}
+LaravelLicensingClient::isInGracePeriod();
 
-// Manually start grace period (useful for testing)
+// Manually start (useful for testing)
 LaravelLicensingClient::startGracePeriod();
-
-// Check server health
-if (!LaravelLicensingClient::isServerHealthy()) {
-    // Server is down, grace period may be active
-}
 ```
 
-## Advanced Usage
+The default grace period is 7 days, configurable via `LICENSING_GRACE_PERIOD_DAYS`.
 
-### Custom License Validation
+The middleware automatically enters grace period when the server is unreachable, allowing the application to continue working.
 
-```php
-use LucaLongo\LaravelLicensingClient\Services\TokenValidator;
+## Artisan Commands
 
-class CustomLicenseValidator
-{
-    public function __construct(
-        private TokenValidator $validator
-    ) {}
+```bash
+# Activate a license (interactive if no key provided)
+php artisan license:activate LIC-XXXX-XXXX-XXXX-XXXX
 
-    public function validateBusinessRules(string $token): bool
-    {
-        try {
-            $claims = $this->validator->validate($token);
+# Validate current license
+php artisan license:validate
 
-            // Custom validation logic
-            if ($claims['plan'] !== 'enterprise') {
-                return false;
-            }
+# Display license details
+php artisan license:info
 
-            // Check custom features
-            $requiredFeatures = ['api_access', 'white_label'];
-            $hasFeatures = !empty(array_intersect(
-                $requiredFeatures,
-                $claims['features'] ?? []
-            ));
+# Refresh token from server
+php artisan license:refresh
 
-            return $hasFeatures;
-        } catch (\Exception $e) {
-            return false;
-        }
-    }
-}
+# Deactivate license (with confirmation prompt)
+php artisan license:deactivate
 ```
 
-### Heartbeat Customization
+## Heartbeat
 
-Send custom data with heartbeats:
+When enabled, the package automatically sends heartbeats to the licensing server at the configured interval. The heartbeat reports:
 
-```php
-// In a service provider or scheduled job
-use LucaLongo\LaravelLicensingClient\Facades\LaravelLicensingClient;
+- Laravel version
+- Application environment
 
-LaravelLicensingClient::heartbeat(
-    licenseKey: 'LICENSE-KEY',
-    data: [
-        'active_users' => User::where('last_login', '>', now()->subDay())->count(),
-        'storage_used' => DiskUsage::calculate(),
-        'api_calls_today' => ApiLog::today()->count(),
-    ]
-);
+Configure in `.env`:
+
+```env
+LICENSING_HEARTBEAT_ENABLED=true
+LICENSING_HEARTBEAT_INTERVAL=3600  # seconds
 ```
 
-### Token Storage Access
+The heartbeat is registered as a scheduled task in the service provider and runs via Laravel's scheduler.
 
-Direct access to token storage for advanced scenarios:
+## Token Validation
 
-```php
-use LucaLongo\LaravelLicensingClient\Services\TokenStorage;
+The client validates PASETO v4 tokens offline using the Ed25519 public key. The following claims are validated:
 
-class LicenseDebugService
-{
-    public function __construct(
-        private TokenStorage $storage
-    ) {}
+| Claim | Validation |
+|---|---|
+| `usage_fingerprint` | Must match the current device fingerprint |
+| `exp` | Token must not be expired |
+| `status` | Must be `active` or `grace` |
+| `force_online_after` | If past, an online refresh is required |
 
-    public function debugInfo(string $licenseKey): array
-    {
-        return [
-            'has_token' => $this->storage->exists($licenseKey),
-            'last_heartbeat' => $this->storage->getLastHeartbeat($licenseKey),
-            'grace_period' => $this->storage->getGracePeriod(),
-            'cached' => Cache::has("license_token:{$licenseKey}"),
-        ];
-    }
-}
-```
+The client also stores the `public_key_bundle` received from the server during activation and refresh, enabling future key rotation support.
 
-### Custom Fingerprint Generation
+## Device Fingerprinting
 
-Extend the fingerprint generator for custom device identification:
+The client generates a stable SHA-256 fingerprint from:
+
+- Hostname
+- Machine ID (platform-specific: `/etc/machine-id`, `IOPlatformUUID`, WMI UUID)
+- PHP version
+- Laravel version
+- Application key
+
+This fingerprint is sent to the server during activation to bind the license to the device.
+
+### Custom Fingerprint Generator
 
 ```php
 use LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator;
@@ -479,13 +290,13 @@ class CustomFingerprintGenerator extends FingerprintGenerator
 {
     public function generate(): string
     {
-        $metadata = $this->getMetadata();
+        $components = [
+            $this->getHostname(),
+            $this->getMachineId(),
+            config('app.deployment_id'),
+        ];
 
-        // Add custom identifiers
-        $metadata['docker_container'] = env('HOSTNAME');
-        $metadata['deployment_id'] = config('app.deployment_id');
-
-        return hash('sha256', json_encode($metadata));
+        return hash('sha256', implode('|', array_filter($components)));
     }
 }
 
@@ -495,193 +306,154 @@ $this->app->bind(FingerprintGenerator::class, CustomFingerprintGenerator::class)
 
 ## Error Handling
 
-The package throws specific exceptions for different scenarios:
+The package throws `LicensingException` with specific factory methods:
 
 ```php
 use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
-use LucaLongo\LaravelLicensingClient\Facades\LaravelLicensingClient;
 
 try {
     LaravelLicensingClient::validate();
 } catch (LicensingException $e) {
-    switch ($e->getMessage()) {
-        case 'The license has expired.':
-            // Handle expiration
-            break;
-        case 'License usage limit has been exceeded.':
-            // Handle usage limit
-            break;
-        case 'Device fingerprint does not match the licensed device.':
-            // Handle device mismatch
-            break;
-        case 'The license has not been activated.':
-            // Prompt for activation
-            break;
-        default:
-            // Generic error handling
-            Log::error('License validation failed', [
-                'error' => $e->getMessage()
-            ]);
+    // Possible messages:
+    // - "The provided license key is invalid."
+    // - "The license has expired."
+    // - "The license has not been activated."
+    // - "The license has been suspended."
+    // - "The license has been cancelled."
+    // - "Device fingerprint does not match the licensed device."
+    // - "The fingerprint is already in use by another device."
+    // - "License usage limit has been exceeded."
+    // - "Offline tokens are not enabled for this license."
+    // - "Too many requests to the licensing server. Please try again later."
+    // - "Online verification is required. Please connect to the internet."
+    // - "Unable to reach the licensing server."
+    // - "The license token is invalid or corrupted."
+    // - "Public key for token verification is not configured."
+}
+```
+
+## API Communication
+
+The client communicates with the server at `/api/licensing/v1/` using these endpoints:
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/activate` | Activate a license with fingerprint |
+| POST | `/deactivate` | Deactivate a license |
+| POST | `/refresh` | Refresh the PASETO token |
+| POST | `/heartbeat` | Send heartbeat with usage data |
+| POST | `/validate` | Validate license server-side |
+| POST | `/licenses/show` | Get license information |
+| GET | `/health` | Check server health |
+
+All responses follow the format:
+
+```json
+{
+    "success": true,
+    "data": { ... }
+}
+```
+
+Error responses:
+
+```json
+{
+    "success": false,
+    "error": {
+        "code": "ERROR_CODE",
+        "message": "Human-readable message"
     }
 }
 ```
+
+The client handles these HTTP error codes: 404 (invalid key), 403 (fingerprint mismatch / not active), 409 (usage limit / fingerprint conflict / offline disabled), 410 (expired), 422 (validation failed), 423 (suspended / cancelled), 429 (rate limited).
 
 ## Testing
 
-The package includes comprehensive test coverage. When using in your tests:
+### In Your Application Tests
 
 ```php
-use LucaLongo\LaravelLicensingClient\Facades\LaravelLicensingClient;
 use Illuminate\Support\Facades\Http;
+use LucaLongo\LaravelLicensingClient\Facades\LaravelLicensingClient;
 
-class FeatureTest extends TestCase
+public function test_protected_route(): void
 {
-    public function test_protected_route_with_valid_license()
-    {
-        // Mock the licensing server responses
-        Http::fake([
-            '*/api/licensing/v1/activate' => Http::response([
-                'token' => 'valid-paseto-token',
-                'expires_at' => now()->addYear()->toIso8601String(),
-            ], 200),
-        ]);
+    Http::fake([
+        '*/api/licensing/v1/activate' => Http::response([
+            'success' => true,
+            'data' => [
+                'token' => 'v4.public.test-token...',
+                'license' => ['id' => 'ulid', 'status' => 'active'],
+            ],
+        ]),
+    ]);
 
-        // Activate a test license
-        LaravelLicensingClient::activate('TEST-LICENSE');
+    LaravelLicensingClient::activate('TEST-KEY');
 
-        // Test protected route
-        $response = $this->get('/protected-route');
-        $response->assertStatus(200);
-    }
-
-    public function test_grace_period_activation()
-    {
-        // Mock server as unreachable
-        Http::fake([
-            '*/api/licensing/v1/*' => Http::response(null, 500),
-        ]);
-
-        // Start grace period
-        LaravelLicensingClient::startGracePeriod();
-
-        // Should still access protected routes
-        $response = $this->get('/protected-route');
-        $response->assertStatus(200);
-    }
+    $this->get('/protected-route')->assertStatus(200);
 }
 ```
 
-### Mocking in Unit Tests
+### Mocking the Client
 
 ```php
 use LucaLongo\LaravelLicensingClient\LaravelLicensingClient;
-use Mockery;
 
-class ServiceTest extends TestCase
-{
-    public function test_service_with_license_check()
-    {
-        $licensingMock = Mockery::mock(LaravelLicensingClient::class);
-        $licensingMock->shouldReceive('isValid')
-            ->once()
-            ->andReturn(true);
-        $licensingMock->shouldReceive('getLicenseInfo')
-            ->once()
-            ->andReturn([
-                'customer_email' => 'test@example.com',
-                'features' => ['premium'],
-            ]);
-
-        $this->app->instance(LaravelLicensingClient::class, $licensingMock);
-
-        // Test your service
-        $service = app(YourService::class);
-        $result = $service->premiumFeature();
-
-        $this->assertTrue($result);
-    }
-}
-```
-
-## Troubleshooting
-
-### Common Issues
-
-#### License validation fails with "Invalid public key format"
-- Ensure the PASETO v4 public key is correctly formatted
-- The key should be base64-encoded in the correct PASETO format
-- Verify the key matches the one used by the licensing server
-
-#### Grace period not activating
-- Check that the grace period is configured in hours (default: 72)
-- Verify the server health endpoint is correctly configured
-- Check storage permissions for the grace period file
-
-#### Heartbeat not sending
-- Ensure heartbeat is enabled in configuration
-- Check the heartbeat interval setting
-- Verify network connectivity to the licensing server
-
-#### Token not caching
-- Verify cache is enabled in configuration
-- Check the configured cache store exists
-- Ensure cache permissions are set correctly
-
-### Debug Mode
-
-Enable debug logging for troubleshooting:
-
-```php
-// In config/logging.php
-'channels' => [
-    'licensing' => [
-        'driver' => 'single',
-        'path' => storage_path('logs/licensing.log'),
-        'level' => env('LICENSING_LOG_LEVEL', 'debug'),
-    ],
-],
-```
-
-Then in your code:
-
-```php
-use Illuminate\Support\Facades\Log;
-
-Log::channel('licensing')->info('License check', [
-    'valid' => LaravelLicensingClient::isValid(),
-    'info' => LaravelLicensingClient::getLicenseInfo(),
+$mock = Mockery::mock(LaravelLicensingClient::class);
+$mock->shouldReceive('isValid')->andReturn(true);
+$mock->shouldReceive('getLicenseInfo')->andReturn([
+    'status' => 'active',
+    'max_usages' => 5,
 ]);
+
+$this->app->instance(LaravelLicensingClient::class, $mock);
 ```
 
-## Security Considerations
+### Running Package Tests
 
-1. **Store the public key securely**: Use environment variables, never commit to version control
-2. **Validate fingerprints**: Ensure device fingerprinting is properly configured to prevent license sharing
-3. **Monitor heartbeats**: Track unusual patterns in heartbeat data for potential abuse
-4. **Implement rate limiting**: Add rate limiting to license validation endpoints
-5. **Audit license usage**: Log all activation, deactivation, and validation events
-6. **Secure token storage**: Tokens are automatically encrypted when stored
+```bash
+composer test              # Run all tests
+composer test-coverage     # Run with coverage
+composer analyse           # PHPStan static analysis
+composer format            # Laravel Pint formatting
+```
+
+## Development Roadmap
+
+The following features are planned for future releases:
+
+### Phase 1 — Token Security
+- `iss` (issuer) claim validation
+- `nbf` (not before) claim validation
+- Clock skew tolerance (configurable, default ±60s)
+
+### Phase 2 — Features & Entitlements
+- `hasFeature(string $feature): bool` and `getFeatures(): array`
+- `getEntitlement(string $key, mixed $default = null): mixed`
+- Feature-gating middleware: `Route::middleware('license:premium_export')`
+- Features and entitlements are stored from the API response (not in the token)
+
+### Phase 3 — Network Resilience
+- Automatic retry with exponential backoff via `Http::retry()`
+
+### Phase 4 — License Information
+- Seat info: `getSeatsInfo()` (active/available/max usages)
+- License vs token expiry distinction: `isLicenseExpiringSoon()`
+- Server-side grace period awareness from `grace_until` token claim
+
+### Phase 5 — Key Rotation
+- Public key selection via `kid` from token footer
+- Proactive scheduled token refresh based on `refresh_after`
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please submit a Pull Request.
 
 ## License
 
-This package is open-sourced software licensed under the [MIT license](LICENSE.md).
-
-## Support
-
-For issues and questions, please use the [GitHub issue tracker](https://github.com/masterix21/laravel-licensing-client/issues).
-
-Consider [sponsoring this project](https://github.com/sponsors/masterix21) if you use it in production!
+MIT License. See [LICENSE.md](LICENSE.md).
 
 ## Credits
 
 - [Luca Longo](https://github.com/masterix21)
-- Built to work with [Laravel Licensing](https://github.com/masterix21/laravel-licensing) server
-- Admin interface available via [Laravel Licensing Filament Manager](https://github.com/masterix21/laravel-licensing-filament-manager)
-
-## Changelog
-
-Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
