@@ -100,4 +100,19 @@ class LicensingException extends Exception
     {
         return new self('Public key for token verification is not configured.');
     }
+
+    public static function invalidCertificateChain(): self
+    {
+        return new self('Certificate chain verification failed.');
+    }
+
+    public static function invalidIssuer(): self
+    {
+        return new self('Token issuer does not match expected issuer.');
+    }
+
+    public static function tokenNotYetValid(): self
+    {
+        return new self('The license token is not yet valid.');
+    }
 }

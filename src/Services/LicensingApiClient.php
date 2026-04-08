@@ -250,10 +250,20 @@ class LicensingApiClient
             return LicensingException::usageLimitExceeded();
         }
 
+        if ($status === 400) {
+            $message = $e->response->json('error.message') ?? 'Request failed';
+
+            return LicensingException::activationFailed($message);
+        }
+
         if ($status === 422) {
             $message = $e->response->json('error.message') ?? 'Validation failed';
 
             return LicensingException::invalidConfiguration($message);
+        }
+
+        if ($status >= 500) {
+            return LicensingException::serverUnreachable();
         }
 
         return match ($context) {

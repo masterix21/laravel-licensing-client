@@ -241,6 +241,16 @@ class LaravelLicensingClient
     }
 
     /**
+     * Get the stored license entitlements
+     *
+     * @return array<string, mixed>
+     */
+    public function getEntitlements(): array
+    {
+        return $this->tokenStorage->getEntitlements();
+    }
+
+    /**
      * Check if a proactive refresh should be done based on refresh_after
      */
     public function shouldRefreshProactively(): bool
@@ -300,16 +310,53 @@ class LaravelLicensingClient
     }
 
     /**
+     * Initialize the token validator with a stored public key bundle if available
+     */
+    public function initializeFromStoredBundle(): void
+    {
+        $bundle = $this->tokenStorage->getPublicKeyBundle();
+
+        if (! $bundle) {
+            return;
+        }
+
+        $this->applyPublicKeyBundle($bundle);
+    }
+
+    /**
      * Store metadata from server response (public_key_bundle, refresh_after)
      */
     protected function storeServerMetadata(array $data): void
     {
         if (isset($data['public_key_bundle'])) {
             $this->tokenStorage->storePublicKeyBundle($data['public_key_bundle']);
+            $this->applyPublicKeyBundle($data['public_key_bundle']);
         }
 
         if (isset($data['refresh_after'])) {
             $this->tokenStorage->storeRefreshAfter($data['refresh_after']);
+        }
+
+        if (isset($data['license']['entitlements'])) {
+            $this->tokenStorage->storeEntitlements($data['license']['entitlements']);
+        }
+    }
+
+    /**
+     * Apply the signing and root keys from a public key bundle to the token validator
+     */
+    protected function applyPublicKeyBundle(array $bundle): void
+    {
+        $signingPublicKey = $bundle['signing']['public_key'] ?? null;
+
+        if ($signingPublicKey) {
+            $this->tokenValidator->updatePublicKey($signingPublicKey);
+        }
+
+        $rootPublicKey = $bundle['root']['public_key'] ?? null;
+
+        if ($rootPublicKey) {
+            $this->tokenValidator->setRootPublicKey($rootPublicKey);
         }
     }
 

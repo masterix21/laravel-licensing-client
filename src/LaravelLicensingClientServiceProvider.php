@@ -43,12 +43,16 @@ class LaravelLicensingClientServiceProvider extends PackageServiceProvider
 
         // Register main client as singleton
         $this->app->singleton(LaravelLicensingClient::class, function ($app) {
-            return new LaravelLicensingClient(
+            $client = new LaravelLicensingClient(
                 $app->make(FingerprintGenerator::class),
                 $app->make(LicensingApiClient::class),
                 $app->make(TokenStorage::class),
                 $app->make(TokenValidator::class)
             );
+
+            $client->initializeFromStoredBundle();
+
+            return $client;
         });
 
         // Register alias

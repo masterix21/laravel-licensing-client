@@ -6,8 +6,10 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\File;
 use LucaLongo\LaravelLicensingClient\LaravelLicensingClientServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use ParagonIE\Paseto\Builder;
 use ParagonIE\Paseto\Keys\AsymmetricPublicKey;
 use ParagonIE\Paseto\Keys\AsymmetricSecretKey;
+use ParagonIE\Paseto\Protocol\Version4;
 
 class TestCase extends Orchestra
 {
@@ -87,7 +89,7 @@ class TestCase extends Orchestra
     protected function generateTestToken(array $claims = []): string
     {
         $this->initializeTestProperties();
-        $builder = \ParagonIE\Paseto\Builder::getPublic($this->privateKey, new \ParagonIE\Paseto\Protocol\Version4);
+        $builder = Builder::getPublic($this->privateKey, new Version4);
 
         $defaultClaims = [
             'sub' => '1',
@@ -108,5 +110,89 @@ class TestCase extends Orchestra
         return $builder
             ->withClaims($finalClaims)
             ->toString();
+    }
+
+    /**
+     * Generate a test token with a JSON footer (for certificate chain tests)
+     *
+     * @param  array<string, mixed>  $claims
+     * @param  array<string, mixed>  $footer
+     */
+    protected function generateTestTokenWithFooter(array $claims = [], array $footer = []): string
+    {
+        $this->initializeTestProperties();
+        $builder = Builder::getPublic($this->privateKey, new Version4);
+
+        $defaultClaims = [
+            'sub' => '1',
+            'iss' => 'laravel-licensing',
+            'license_id' => 1,
+            'license_key_hash' => hash('sha256', 'TEST-LICENSE-KEY'),
+            'usage_fingerprint' => app(\LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator::class)->generate(),
+            'status' => 'active',
+            'max_usages' => 5,
+            'exp' => now()->addYear()->toIso8601String(),
+            'nbf' => now()->toIso8601String(),
+            'iat' => now()->toIso8601String(),
+            'force_online_after' => now()->addDays(14)->toIso8601String(),
+        ];
+
+        $finalClaims = array_merge($defaultClaims, $claims);
+
+        return $builder
+            ->withClaims($finalClaims)
+            ->setFooterArray($footer)
+            ->toString();
+    }
+
+    /**
+     * Generate a test root+signing keypair and signed certificate for chain verification tests
+     *
+     * @return array{root_public_key: string, signing_public_key: string, chain: array<string, mixed>}
+     */
+    protected function generateTestCertificateChain(): array
+    {
+        $rootKeypair = sodium_crypto_sign_keypair();
+        $rootPublicKey = sodium_crypto_sign_publickey($rootKeypair);
+        $rootSecretKey = sodium_crypto_sign_secretkey($rootKeypair);
+
+        $signingKeypair = sodium_crypto_sign_keypair();
+        $signingPublicKey = sodium_crypto_sign_publickey($signingKeypair);
+
+        $certificate = [
+            'kid' => 'test-signing-key',
+            'public_key' => base64_encode($signingPublicKey),
+            'valid_from' => now()->subDay()->toIso8601String(),
+            'valid_until' => now()->addYear()->toIso8601String(),
+            'issued_at' => now()->toIso8601String(),
+            'issuer_kid' => 'test-root-key',
+        ];
+
+        $signature = sodium_crypto_sign_detached(json_encode($certificate), $rootSecretKey);
+
+        $signedCertificate = json_encode([
+            'certificate' => $certificate,
+            'signature' => base64_encode($signature),
+        ]);
+
+        return [
+            'root_public_key' => base64_encode($rootPublicKey),
+            'signing_public_key' => base64_encode($signingPublicKey),
+            'chain' => [
+                'signing' => [
+                    'kid' => 'test-signing-key',
+                    'public_key' => base64_encode($signingPublicKey),
+                    'certificate' => $signedCertificate,
+                    'valid_from' => now()->subDay()->toIso8601String(),
+                    'valid_until' => now()->addYear()->toIso8601String(),
+                ],
+                'root' => [
+                    'kid' => 'test-root-key',
+                    'public_key' => base64_encode($rootPublicKey),
+                    'valid_from' => now()->subYear()->toIso8601String(),
+                    'valid_until' => now()->addYears(5)->toIso8601String(),
+                ],
+            ],
+        ];
     }
 }

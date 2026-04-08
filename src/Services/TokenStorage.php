@@ -183,6 +183,35 @@ class TokenStorage
     }
 
     /**
+     * Store license entitlements from the server response
+     */
+    public function storeEntitlements(array $entitlements): void
+    {
+        $filename = $this->storagePath.'/entitlements.json';
+        File::put($filename, encrypt(json_encode($entitlements)));
+    }
+
+    /**
+     * Get stored license entitlements
+     *
+     * @return array<string, mixed>
+     */
+    public function getEntitlements(): array
+    {
+        $filename = $this->storagePath.'/entitlements.json';
+
+        if (! File::exists($filename)) {
+            return [];
+        }
+
+        try {
+            return json_decode(decrypt(File::get($filename)), true) ?? [];
+        } catch (\Exception) {
+            return [];
+        }
+    }
+
+    /**
      * Store grace period data
      */
     public function storeGracePeriodData(array $data): void

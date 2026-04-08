@@ -390,3 +390,114 @@ it('returns false for isInGracePeriod when no grace data', function () {
 
     expect($this->client->isInGracePeriod())->toBeFalse();
 });
+
+it('initializes from stored bundle on boot', function () {
+    $bundle = [
+        'signing' => ['public_key' => 'signing-key-base64'],
+        'root' => ['public_key' => 'root-key-base64'],
+    ];
+
+    $this->tokenStorage->shouldReceive('getPublicKeyBundle')
+        ->once()
+        ->andReturn($bundle);
+
+    $this->tokenValidator->shouldReceive('updatePublicKey')
+        ->with('signing-key-base64')
+        ->once();
+
+    $this->tokenValidator->shouldReceive('setRootPublicKey')
+        ->with('root-key-base64')
+        ->once();
+
+    $this->client->initializeFromStoredBundle();
+});
+
+it('skips initialization when no stored bundle exists', function () {
+    $this->tokenStorage->shouldReceive('getPublicKeyBundle')
+        ->once()
+        ->andReturn(null);
+
+    $this->tokenValidator->shouldNotReceive('updatePublicKey');
+    $this->tokenValidator->shouldNotReceive('setRootPublicKey');
+
+    $this->client->initializeFromStoredBundle();
+});
+
+it('applies public key bundle when activating', function () {
+    config(['licensing-client.license_key' => 'TEST-KEY']);
+
+    $bundle = [
+        'signing' => ['public_key' => 'new-signing-key'],
+        'root' => ['public_key' => 'new-root-key'],
+    ];
+
+    $this->fingerprintGenerator->shouldReceive('getMetadata')
+        ->once()
+        ->andReturn([]);
+
+    $this->apiClient->shouldReceive('activate')
+        ->once()
+        ->andReturn([
+            'success' => true,
+            'data' => [
+                'token' => 'test-token',
+                'public_key_bundle' => $bundle,
+            ],
+        ]);
+
+    $this->tokenStorage->shouldReceive('store')->once();
+    $this->tokenStorage->shouldReceive('storeLastHeartbeat')->once();
+    $this->tokenStorage->shouldReceive('storePublicKeyBundle')->with($bundle)->once();
+
+    $this->tokenValidator->shouldReceive('updatePublicKey')
+        ->with('new-signing-key')
+        ->once();
+
+    $this->tokenValidator->shouldReceive('setRootPublicKey')
+        ->with('new-root-key')
+        ->once();
+
+    $result = $this->client->activate();
+
+    expect($result)->toBeTrue();
+});
+
+it('returns stored entitlements', function () {
+    $this->tokenStorage->shouldReceive('getEntitlements')
+        ->once()
+        ->andReturn(['feature_a', 'feature_b']);
+
+    $result = $this->client->getEntitlements();
+
+    expect($result)->toBe(['feature_a', 'feature_b']);
+});
+
+it('stores entitlements from server response', function () {
+    config(['licensing-client.license_key' => 'TEST-KEY']);
+
+    $this->fingerprintGenerator->shouldReceive('getMetadata')
+        ->once()
+        ->andReturn([]);
+
+    $this->apiClient->shouldReceive('activate')
+        ->once()
+        ->andReturn([
+            'success' => true,
+            'data' => [
+                'token' => 'test-token',
+                'license' => [
+                    'entitlements' => ['api_access', 'premium'],
+                ],
+            ],
+        ]);
+
+    $this->tokenStorage->shouldReceive('store')->once();
+    $this->tokenStorage->shouldReceive('storeLastHeartbeat')->once();
+    $this->tokenStorage->shouldReceive('storeEntitlements')
+        ->with(['api_access', 'premium'])
+        ->once();
+
+    $result = $this->client->activate();
+
+    expect($result)->toBeTrue();
+});

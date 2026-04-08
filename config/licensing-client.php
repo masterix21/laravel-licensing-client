@@ -49,6 +49,11 @@ return [
     'grace_period_days' => env('LICENSING_GRACE_PERIOD_DAYS', 7),
 
     /**
+     * Clock skew tolerance in seconds for token time validation
+     */
+    'clock_skew_seconds' => env('LICENSING_CLOCK_SKEW_SECONDS', 60),
+
+    /**
      * Timeout for API requests in seconds
      */
     'timeout' => env('LICENSING_TIMEOUT', 30),
