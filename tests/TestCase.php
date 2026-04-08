@@ -129,7 +129,7 @@ class TestCase extends Orchestra
             'iss' => 'laravel-licensing',
             'license_id' => 1,
             'license_key_hash' => hash('sha256', 'TEST-LICENSE-KEY'),
-            'usage_fingerprint' => app(\LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator::class)->generate(),
+            'usage_fingerprint' => app(FingerprintGenerator::class)->generate(),
             'status' => 'active',
             'max_usages' => 5,
             'exp' => now()->addYear()->toIso8601String(),
