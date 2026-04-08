@@ -2,6 +2,7 @@
 
 namespace LucaLongo\LaravelLicensingClient\Services;
 
+use Illuminate\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
@@ -217,7 +218,7 @@ class TokenStorage
 
         // Clear all cache entries
         if (config('licensing-client.cache.enabled')) {
-            /** @var \Illuminate\Cache\Repository $store */
+            /** @var Repository $store */
             $store = Cache::store(config('licensing-client.cache.store'));
             $store->getStore()->flush();
         }

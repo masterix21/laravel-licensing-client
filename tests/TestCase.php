@@ -5,9 +5,12 @@ namespace LucaLongo\LaravelLicensingClient\Tests;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\File;
 use LucaLongo\LaravelLicensingClient\LaravelLicensingClientServiceProvider;
+use LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator;
 use Orchestra\Testbench\TestCase as Orchestra;
+use ParagonIE\Paseto\Builder;
 use ParagonIE\Paseto\Keys\AsymmetricPublicKey;
 use ParagonIE\Paseto\Keys\AsymmetricSecretKey;
+use ParagonIE\Paseto\Protocol\Version4;
 
 class TestCase extends Orchestra
 {
@@ -75,7 +78,7 @@ class TestCase extends Orchestra
     {
         if (! $this->privateKey) {
             // Generate test keys for PASETO v4
-            $this->privateKey = AsymmetricSecretKey::generate(new \ParagonIE\Paseto\Protocol\Version4);
+            $this->privateKey = AsymmetricSecretKey::generate(new Version4);
             $this->publicKey = $this->privateKey->getPublicKey();
 
             // Set test storage path
@@ -87,14 +90,14 @@ class TestCase extends Orchestra
     protected function generateTestToken(array $claims = []): string
     {
         $this->initializeTestProperties();
-        $builder = \ParagonIE\Paseto\Builder::getPublic($this->privateKey, new \ParagonIE\Paseto\Protocol\Version4);
+        $builder = Builder::getPublic($this->privateKey, new Version4);
 
         $defaultClaims = [
             'sub' => '1',
             'iss' => 'laravel-licensing',
             'license_id' => 1,
             'license_key_hash' => hash('sha256', 'TEST-LICENSE-KEY'),
-            'usage_fingerprint' => app(\LucaLongo\LaravelLicensingClient\Services\FingerprintGenerator::class)->generate(),
+            'usage_fingerprint' => app(FingerprintGenerator::class)->generate(),
             'status' => 'active',
             'max_usages' => 5,
             'exp' => now()->addYear()->toIso8601String(),

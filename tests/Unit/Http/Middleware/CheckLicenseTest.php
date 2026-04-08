@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
 use LucaLongo\LaravelLicensingClient\Http\Middleware\CheckLicense;
 use LucaLongo\LaravelLicensingClient\LaravelLicensingClient;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 beforeEach(function () {
     $this->client = Mockery::mock(LaravelLicensingClient::class);
@@ -86,7 +87,7 @@ it('blocks when force online refresh fails', function () {
         ->andReturn(false);
 
     $this->middleware->handle($this->request, $this->next);
-})->throws(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+})->throws(HttpException::class);
 
 it('allows excluded routes without checking license', function () {
     config(['licensing-client.excluded_routes' => ['test']]);
@@ -199,7 +200,7 @@ it('blocks request when license is invalid and not in grace period', function ()
         ->andReturn(true);
 
     $this->middleware->handle($this->request, $this->next);
-})->throws(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+})->throws(HttpException::class);
 
 it('returns JSON error for API requests', function () {
     $request = Request::create('/api/test', 'GET');
@@ -275,7 +276,7 @@ it('handles license exceptions properly', function () {
         ->andThrow($exception);
 
     $this->middleware->handle($this->request, $this->next);
-})->throws(\Symfony\Component\HttpKernel\Exception\HttpException::class, 'The license has expired.');
+})->throws(HttpException::class, 'The license has expired.');
 
 it('returns JSON error for license exceptions in API requests', function () {
     $request = Request::create('/api/test', 'GET');
