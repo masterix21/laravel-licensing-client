@@ -4,7 +4,7 @@ namespace LucaLongo\LaravelLicensingClient\Services;
 
 use Carbon\Carbon;
 use LucaLongo\LaravelLicensingClient\Exceptions\LicensingException;
-use ParagonIE\Paseto\Keys\Base\AsymmetricPublicKey;
+use ParagonIE\Paseto\Keys\AsymmetricPublicKey;
 use ParagonIE\Paseto\Parser;
 use ParagonIE\Paseto\Protocol\Version4;
 use ParagonIE\Paseto\ProtocolCollection;
@@ -191,7 +191,7 @@ class TokenValidator
         }
 
         try {
-            $this->publicKey = AsymmetricPublicKey::fromEncodedString($publicKeyString, new Version4);
+            $this->publicKey = $this->parsePublicKey($publicKeyString);
             $this->parser = Parser::getPublic($this->publicKey, ProtocolCollection::v4());
             $this->configureParser();
         } catch (\Exception $e) {
@@ -205,12 +205,32 @@ class TokenValidator
     public function updatePublicKey(string $publicKeyString): void
     {
         try {
-            $this->publicKey = AsymmetricPublicKey::fromEncodedString($publicKeyString, new Version4);
+            $this->publicKey = $this->parsePublicKey($publicKeyString);
             $this->parser = Parser::getPublic($this->publicKey, ProtocolCollection::v4());
             $this->configureParser();
         } catch (\Exception $e) {
             throw LicensingException::invalidConfiguration('Invalid public key format');
         }
+    }
+
+    /**
+     * Build an Ed25519 public key from either encoding a server may hand us.
+     *
+     * The licensing server publishes key material as standard base64 (`licensing:keys:export`
+     * and the `public_key_bundle` returned on activation), while PASETO's fromEncodedString()
+     * reads base64url. Try raw bytes first, then fall back so keys configured in PASETO's own
+     * encoding keep working.
+     */
+    protected function parsePublicKey(string $publicKeyString): AsymmetricPublicKey
+    {
+        $raw = base64_decode($publicKeyString, true);
+
+        if ($raw === false || strlen($raw) !== SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) {
+            // PASETO's own base64url alphabet (and anything else we don't recognise).
+            $raw = AsymmetricPublicKey::fromEncodedString($publicKeyString, new Version4)->raw();
+        }
+
+        return new AsymmetricPublicKey($raw, new Version4);
     }
 
     /**

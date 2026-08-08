@@ -158,6 +158,17 @@ it('can update public key for key rotation', function () {
     expect($claims['status'])->toBe('active');
 });
 
+it('accepts the standard base64 public keys the server ships in its key bundle', function () {
+    // licensing:keys:export and the activation public_key_bundle use standard base64,
+    // not PASETO's base64url alphabet. Without this, every activate after a fresh install fails.
+    $this->validator->updatePublicKey(base64_encode($this->publicKey->raw()));
+
+    $claims = $this->validator->validate($this->generateTestToken());
+
+    expect($claims)->toBeArray()
+        ->and($claims['status'])->toBe('active');
+});
+
 it('throws exception for invalid public key in updatePublicKey', function () {
     $this->validator->updatePublicKey('invalid-key');
 })->throws(LicensingException::class, 'Invalid public key format');
